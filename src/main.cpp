@@ -32,22 +32,25 @@ unsigned long countUI = 0;
 unsigned long countBlink = 0;
 bool btConnected = false;
 int localPreset;
+bool blinkOn() {if(round(millis()/400)*400 != round(millis()/300)*300 ) return true; else return false;}
+
 
 /* BUTTONS Init ============================================================================== */
 const uint8_t BUTTONS_NUM = 4;
 
 struct s_buttons {
   const uint8_t pin;
-  const char* efxShortName[3];
+  const String efxLabel; //don't like String here, but further GUI functiions require Strings :-/
+  const String actLabel;
   const uint8_t ledAddr; //future needs for addressable RGB LEDs
   uint32_t ledState; //data type may change, as i read the docs, enum of selected rgb colors maybe
 };
 
 s_buttons BUTTONS[BUTTONS_NUM] = {
-  {25, "DRV", 0, 0},
-  {26, "MOD", 0, 0},
-  {27, "DLY", 0, 0},
-  {14, "RVB", 0, 0}
+  {25, "DRV", "DLO", 0, 0},
+  {26, "MOD", "SAV", 0, 0},
+  {27, "DLY", "PRV", 0, 0},
+  {14, "RVB", "NXT", 0, 0}
 };
 
 ace_button::AceButton buttons[BUTTONS_NUM];
@@ -63,11 +66,7 @@ void handleEvent(ace_button::AceButton*, uint8_t, uint8_t); //forward ref
 OLEDDisplayUi ui( &display );
 
 void msOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
-  if (!btConnected) {
- /*   if(round(millis()/400)*400 != round(millis()/300)*300 ) {
-      display->drawXbm(display->width()-7, 0, small_bt_logo_width, small_bt_logo_height, small_bt_logo_bits);
-    } */
-  } else { 
+  if (btConnected) {
     display->drawXbm(display->width()-7, 0, small_bt_logo_width, small_bt_logo_height, small_bt_logo_bits);
   } 
 }
@@ -81,16 +80,32 @@ void frameBtConnect(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, 
 
 void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
 
-  display->setFont(DSEG14_Classic_Bold_48);
+  display->setFont(Roboto_Mono_Medium_52);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString(64 + x, 11 + y, String("18B.") );
+  display->drawString(64 + x, 11 + y, String(localPreset) );
+  
+  display->setFont(ArialMT_Plain_10);
+  int pxPerLabel = (display->width() - 8) / BUTTONS_NUM;
+  int boxWidth = display->getStringWidth("WWW")+1;
+  for (int i=0 ; i<BUTTONS_NUM; i++) {
+    display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,13);
+    display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].efxLabel));
+  }
 
 }
 
 void framePresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-  display->setFont(DSEG14_Classic_Bold_48);
+  display->setFont(Roboto_Mono_Medium_52);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
   display->drawString(64 + x, 17 + y, String(localPreset) );
+  
+  display->setFont(ArialMT_Plain_10);
+  int pxPerLabel = (display->width() - 8) / BUTTONS_NUM;
+  int boxWidth = display->getStringWidth("WWW")+1;
+  for (int i=0 ; i<BUTTONS_NUM; i++) {
+    display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,13);
+    display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].actLabel));
+  }
 }
 
 void frameAbout(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
@@ -131,11 +146,13 @@ void setup() {
   ui.disableAllIndicators();
   ui.setFrameAnimation(SLIDE_LEFT);
   ui.setFrames(frames, frameCount);
+  ui.setTimePerTransition(200);
   ui.setOverlays(overlays, overlaysCount);
   ui.disableAutoTransition();
   // Initialising the UI will init the display too.
   ui.init();
   display.flipScreenVertically();
+  display.setColor(INVERSE);
   ui.switchToFrame(MODE_ABOUT);// show welcome screen
   ui.update();
   delay(1000);
@@ -155,6 +172,9 @@ void setup() {
   buttonConfig->setFeature(ace_button::ButtonConfig::kFeatureClick);
   buttonConfig->setFeature(ace_button::ButtonConfig::kFeatureDoubleClick);
   buttonConfig->setFeature(ace_button::ButtonConfig::kFeatureLongPress);
+  buttonConfig->setFeature(ace_button::ButtonConfig::kFeatureSuppressAfterLongPress);
+  buttonConfig->setFeature(ace_button::ButtonConfig::kFeatureSuppressAfterDoubleClick);
+  buttonConfig->setFeature(ace_button::ButtonConfig::kFeatureSuppressAfterClick);
 
   btInit();
   DEBUG("Setup(): done");
@@ -199,6 +219,12 @@ void handleEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t butto
       case ace_button::AceButton::kEventPressed:
         break;
       case ace_button::AceButton::kEventLongPressed:
+        if (id==3) {
+          mode = MODE_PRESETS;
+          ui.transitionToFrame(mode);
+        }
+        break;
+      case ace_button::AceButton::kEventClicked:
         break;
       case ace_button::AceButton::kEventDoubleClicked:
         break;
@@ -209,6 +235,12 @@ void handleEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t butto
       case ace_button::AceButton::kEventPressed:
         break;
       case ace_button::AceButton::kEventLongPressed:
+        if (id==3) {
+          mode = MODE_EFFECTS;
+          ui.transitionToFrame(mode);
+        }
+        break;
+      case ace_button::AceButton::kEventClicked:
         break;
       case ace_button::AceButton::kEventDoubleClicked:
         break;
@@ -248,11 +280,12 @@ void btInit() {
 void btConnect() {
   // Loop until device establishes connection with amp
   while (!btConnected) {
-    DEBUG("Connecting...");
     ui.switchToFrame(MODE_CONNECT);
     ui.update();
+    delay(50); //let cores breathe
+    ui.update(); // kinda workaround for not-switching to this frame
+    DEBUG("Connecting...");
     btConnected = SerialBT.connect(SPARK_BT_NAME);
-    delay(500);
     // If BT connection with amp is successful
     if (btConnected && SerialBT.hasClient()) {
       mode = MODE_EFFECTS;
@@ -260,6 +293,8 @@ void btConnect() {
       ui.update();
       DEBUG("BT Connected");
     } else {
+      ui.switchToFrame(MODE_CONNECT);
+      ui.update();
       // in case of some connection loss
       btConnected = false;
       DEBUG("BT NOT Connected");

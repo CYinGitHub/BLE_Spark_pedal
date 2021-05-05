@@ -3,6 +3,11 @@
 #include "BluetoothSerial.h" 
 #include "AceButton.h"
 #include "MD_REncoder.h"
+// Spark*.* is a portion from Paul Hamshere https://github.com/paulhamsh/
+#include "Spark.h"
+#include "SparkIO.h"
+#include "SparkComms.h"
+
 #ifdef SSD1306WIRE //these global def's are in platformio.ini
   #include "SSD1306Wire.h"
 #endif
@@ -29,9 +34,9 @@ e_mode returnFrame = MODE_EFFECTS;
 const unsigned long FRAME_TIMEOUT = 2000; //(ms) to return to main ui  
 const char* DEVICE_NAME = "Easy Spark";
 const char* VERSION = "0.1a"; 
-const char* SPARK_BT_NAME = "Spark 40 Audio";
+// const char* SPARK_BT_NAME = "Spark 40 Audio";
 const uint8_t TOTAL_PRESETS = 100; // number of stored on board presets
-const uint8_t MAX_LEVEL = 100; // number of stored on board presets
+const uint8_t MAX_LEVEL = 100; // maximum level of effect, actual value in UI is level divided by 10
 unsigned long countBT = 0;
 unsigned long countUI = 0;
 unsigned long countBlink = 0;
@@ -41,16 +46,39 @@ uint8_t localPreset;
 int level = 0;
 unsigned long timeToGoBack;
 
+uint8_t selected_preset;
+
+uint8_t b;
+uint8_t midi_in;
+
+int i, j, p;
+
 /* Forward declarations ====================================================================== */
 void tempFrame(e_mode tempFrame, e_mode returnFrame, const unsigned long msTimeout) ;
 void handleEvent(ace_button::AceButton*, uint8_t, uint8_t);
 void btConnect();
 void btInit();
-void returnToMainUI(); 
+void returnToMainUI();
+void dump_preset(SparkPreset);
 bool blinkOn() {if(round(millis()/400)*400 != round(millis()/300)*300 ) return true; else return false;}
 
-/* BUTTONS Init ============================================================================== */
 
+/* SPARKIE ================================================================================== */
+SparkIO spark_io(false); // do NOT do passthru as only one device here, no serial to the app
+SparkComms spark_comms;
+
+unsigned int cmdsub;
+SparkMessage msg;
+SparkPreset preset;
+SparkPreset presets[6];
+
+unsigned long last_millis;
+int my_state;
+int scr_line;
+char str[50];
+
+
+/* BUTTONS Init ============================================================================== */
 struct s_buttons {
   const uint8_t pin;
   const String efxLabel; //don't like String here, but further GUI functiions require Strings :-/
@@ -88,7 +116,7 @@ MD_REncoder Encoder2 = MD_REncoder(16, 4);
 #endif
 OLEDDisplayUi ui( &display );
 
-void msOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
+void screenOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
   if (btConnected) {
     display->drawXbm(display->width()-7, 0, small_bt_logo_width, small_bt_logo_height, small_bt_logo_bits);
   } 
@@ -102,7 +130,6 @@ void frameBtConnect(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, 
 }
 
 void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-
   display->setFont(Roboto_Mono_Medium_52);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
   display->drawString(64 + x, 11 + y, String(localPreset) );
@@ -139,7 +166,7 @@ void frameAbout(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
 void frameLevel(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   display->setFont(ArialMT_Plain_10);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString(display->width()/2 + x,  y, "VOLUME");
+  display->drawString(display->width()/2 + x,  y, "MASTER");
   
   display->setFont(Roboto_Mono_Medium_52);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
@@ -153,7 +180,7 @@ FrameCallback frames[] = { frameBtConnect, frameEffects, framePresets, frameAbou
 int frameCount = 5;
 
 // Overlays are statically drawn on top of a frame eg. a clock
-OverlayCallback overlays[] = { msOverlay };
+OverlayCallback overlays[] = { screenOverlay };
 int overlaysCount = 1;
 
 
@@ -161,7 +188,6 @@ int overlaysCount = 1;
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
 #error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
 #endif
-BluetoothSerial SerialBT;
 
 
 /* SETUP() WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW */
@@ -187,6 +213,8 @@ void setup() {
   delay(1000);
   ui.switchToFrame(MODE_CONNECT);
   ui.update();
+  spark_io.comms = &spark_comms;
+  spark_comms.start_bt();
 
   for (uint8_t i = 0; i < BUTTONS_NUM; i++) {
     pinMode(BUTTONS[i].pin, INPUT_PULLUP);
@@ -209,7 +237,7 @@ void setup() {
   buttonConfig->setFeature(ace_button::ButtonConfig::kFeatureSuppressAfterDoubleClick);
   buttonConfig->setFeature(ace_button::ButtonConfig::kFeatureSuppressAfterClick);
 
-  btInit();
+  // btInit();
   DEBUG("Setup(): done");
 }
 
@@ -219,16 +247,70 @@ void loop() {
   if (!btConnected) {
     btConnect();
   } else {
+/* SSSSSSSSSSSSSSSSSS-PPPPPPPPPPPPPPPPP-AAAAAAAAAAAAAAAAA-RRRRRRRRRRRRRRRR-KKKKKKKKKKKKKKKKKKK */
+    spark_io.process();
+    if (spark_io.get_message(&cmdsub, &msg, &preset)) { //there is something there
+      sprintf(str, "< %4.4x", cmdsub);
+      DEBUG("From Spark: "  + str);
+      
+      if (cmdsub == 0x0301) {
+        p = preset.preset_num;
+        j = preset.curr_preset;
+        if (p == 0x7f)       
+          p = 4;
+        if (j == 0x01)
+          p = 5;
+        presets[p] = preset;
+        dump_preset(preset);
+      }
+
+      if (cmdsub == 0x0306) {
+        strcpy(presets[5].effects[3].EffectName, msg.str2);
+        DEBUG("Change to amp model ");
+        DEBUG(presets[5].effects[3].EffectName);
+      }
+      if (cmdsub == 0x0363) {
+        DEBUG("Tap Tempo " + msg.val);
+      }
+      if (cmdsub == 0x0337) {
+        DEBUG("Change model parameter ");
+        DEBUG(msg.str1 +" " + msg.param1+ " " + msg.val);
+      }
+      
+      if (cmdsub == 0x0338) {
+        selected_preset = msg.param2;
+        presets[5] = presets[selected_preset];
+        DEBUG("Change to preset: " + selected_preset);
+      }      
+      
+      if (cmdsub == 0x0327) {
+        selected_preset = msg.param2;
+        if (selected_preset == 0x7f) 
+          selected_preset=4;
+        presets[selected_preset] = presets[5];
+        DEBUG("Store in preset: " + selected_preset);
+      }
+
+      if (cmdsub == 0x0310) {
+        selected_preset = msg.param2;
+        j = msg.param1;
+        if (selected_preset == 0x7f) 
+          selected_preset = 4;
+        if (j == 0x01) 
+          selected_preset = 5;
+        presets[5] = presets[selected_preset];
+        DEBUG("Hadware preset is: " + selected_preset);
+      }
+    }
+
+
     if (millis() > countUI ) {
       countUI = ui.update() + millis();
     }
     for (uint8_t i = 0; i < BUTTONS_NUM; i++) {
       buttons[i].check();
     }
-    // Read  response data from amp, to clear BT message buffer
-    if (SerialBT.available()) {
-      SerialBT.read();
-    }
+
     uint8_t x ;
     uint16_t s;
     x = Encoder1.read();
@@ -316,6 +398,7 @@ void handleEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t butto
   }
 }
 
+/*
 //on Bluetooth event
 void btEventCallback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
   // On BT connection close
@@ -326,7 +409,6 @@ void btEventCallback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
     btConnected = false;
   }
 }
-
 //Initialize Bluetooth
 void btInit() {
   // Register BT event callback method
@@ -342,9 +424,8 @@ void btInit() {
     while (true) {};
   }
 }
-
-
-//Conect To Spark Amp
+*/
+// Conect To Spark Amp
 void btConnect() {
   // Loop until device establishes connection with amp
   while (!btConnected) {
@@ -353,9 +434,9 @@ void btConnect() {
     delay(50); //let cores breathe
     ui.update(); // kinda workaround for not-switching to this frame
     DEBUG("Connecting...");
-    btConnected = SerialBT.connect(SPARK_BT_NAME);
+    btConnected =  spark_comms.connect_to_spark();;
     // If BT connection with amp is successful
-    if (btConnected && SerialBT.hasClient()) {
+    if (btConnected && spark_comms.bt->hasClient()) {
       mode = MODE_EFFECTS;
       ui.switchToFrame(mode);
       ui.update();
@@ -386,3 +467,23 @@ void returnToMainUI() {
   timeToGoBack = millis();
   tempUI = false;
 }
+
+void dump_preset(SparkPreset preset) {
+  int i,j;
+
+  DEBUG(preset.curr_preset); DEBUG(" ");
+  DEBUG(preset.preset_num); DEBUG(" ");
+  DEBUG(preset.Name); DEBUG(" ");
+
+  DEBUG(preset.Description);
+
+  for (j=0; j<7; j++) { 
+    DEBUG(preset.effects[j].EffectName) ;
+    if (preset.effects[j].OnOff == true) DEBUG(" On "); else DEBUG (" Off ");
+    for (i = 0; i < preset.effects[j].NumParameters; i++) {
+      DEBUG(preset.effects[j].Parameters[i]) ;
+    } 
+  }
+  DEBUG(preset.chksum); 
+}
+

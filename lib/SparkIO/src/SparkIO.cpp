@@ -351,7 +351,7 @@ void SparkIO::read_string(char *str)
   if (a == 0xd9) {
     read_byte(&len);
   }
-  else if (a > 0xa0) {
+  else if (a >= 0xa0) {
     len = a - 0xa0;
   }
   else {
@@ -448,6 +448,7 @@ bool SparkIO::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset *
   uint8_t num;
 
   if (in_message.is_empty()) return false;
+//  in_message.dump2();
 
   read_byte(&cmd);
   read_byte(&sub);
@@ -512,6 +513,7 @@ bool SparkIO::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset *
       break;
     // response to a request for a full preset
     case 0x0301:
+
       read_byte(&preset->curr_preset);
       read_byte(&preset->preset_num);
       read_string(preset->UUID); 
@@ -591,6 +593,7 @@ void SparkIO::end_message()
   out_message.set_at_index(2, len_h);   
   out_message.set_at_index(3, len_l);
   out_message.commit();
+
 }
 
 void SparkIO::write_byte_no_chksum(byte b)
@@ -672,6 +675,7 @@ void SparkIO::write_onoff (bool onoff)
 
 void SparkIO::change_effect_parameter (char *pedal, int param, float val)
 {
+  expectedSubcmd = 0x0000;
    start_message (0x0104);
    write_prefixed_string (pedal);
    write_byte (byte(param));
@@ -682,6 +686,7 @@ void SparkIO::change_effect_parameter (char *pedal, int param, float val)
 
 void SparkIO::change_effect (char *pedal1, char *pedal2)
 {
+  expectedSubcmd = 0x0306;
    start_message (0x0106);
    write_prefixed_string (pedal1);
    write_prefixed_string (pedal2);
@@ -690,63 +695,94 @@ void SparkIO::change_effect (char *pedal1, char *pedal2)
 
 void SparkIO::change_hardware_preset (uint8_t preset_num)
 {
-   // preset_num is 0 to 3
-
-   start_message (0x0138);
-   write_byte (0);
-   write_byte (preset_num)  ;     
-   end_message();  
+  // preset_num is 0 to 3
+  expectedSubcmd = 0x0338;
+  start_message (0x0138);
+  write_byte (0);
+  write_byte (preset_num)  ;     
+  end_message();  
 }
 
 void SparkIO::turn_effect_onoff (char *pedal, bool onoff)
 {
-   start_message (0x0115);
-   write_prefixed_string (pedal);
-   write_onoff (onoff);
-   end_message();
+  expectedSubcmd = 0x0315;
+  start_message (0x0115);
+  write_prefixed_string (pedal);
+  write_onoff (onoff);
+  end_message();
 }
 
 void SparkIO::get_serial()
 {
-   start_message (0x0223);
-   end_message();  
+  expectedSubcmd = 0x0323;
+  start_message (0x0223);
+  end_message();  
+}
+
+void SparkIO::get_firmware_ver()
+{
+  expectedSubcmd = 0x032f;
+  start_message (0x022f);
+  end_message();  
 }
 
 void SparkIO::get_name()
 {
-   start_message (0x0211);
-   end_message();  
+  expectedSubcmd = 0x0311;
+  start_message (0x0211);
+  end_message();
 }
 
 void SparkIO::get_hardware_preset_number()
 {
-   start_message (0x0210);
-   end_message();  
+  expectedSubcmd = 0x0310;
+  start_message (0x0210);
+  end_message();  
 }
 
 
 void SparkIO::get_preset_details(unsigned int preset)
 {
-   int i;
-   uint8_t h, l;
+  int i;
+  uint8_t h, l;
+  uint_to_bytes(preset, &h, &l);
 
-   uint_to_bytes(preset, &h, &l);
+  expectedSubcmd = 0x0301;
+  start_message (0x0201);
+  write_byte(h);
+  write_byte(l);
+
+  for (i=0; i<30; i++) {
+    write_byte(0);
+  }
+
+  end_message(); 
+}
+
+
+void SparkIO::greeting()
+{
+  // int i; 
    
-   start_message (0x0201);
-   write_byte(h);
-   write_byte(l);
-
+  expectedSubcmd = 0x0000;
+  start_message (0x0224);
+  write_byte(0x00);
+  write_byte(0x01);
+  write_byte(0x02);
+  write_byte(0x03);
+   
+/*
    for (i=0; i<30; i++) {
      write_byte(0);
    }
-   
-   end_message(); 
+*/   
+  end_message(); 
 }
 
 void SparkIO::create_preset(SparkPreset *preset)
 {
   int i, j, siz;
-
+  expectedSubcmd = 0x0301;
   start_message (0x0101);
 
   write_byte_no_chksum (0x00);
@@ -761,7 +797,6 @@ void SparkIO::create_preset(SparkPreset *preset)
   write_string(preset->Icon);
   write_float (preset->BPM);
 
-   
   write_byte (byte(0x90 + 7));       // always 7 pedals
 
   for (i=0; i<7; i++) {
@@ -935,8 +970,8 @@ void SparkIO::process_out_blocks() {
     out_block[6] = ob_pos;
 
     comms->bt->write(out_block, ob_pos);
+    DEBUG("SparkIO: sending over BT");
     ob_last_sent_time = millis();
-
     
     if (!ob_ok_to_send) {
       DEBUG("Blocked");

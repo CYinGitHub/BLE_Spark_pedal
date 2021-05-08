@@ -42,11 +42,11 @@ class SparkIO
     void change_effect_parameter(char *pedal, int param, float val);
 
     void get_serial();
+    void get_firmware_ver();
     void get_name();
     void get_hardware_preset_number();
     void get_preset_details(unsigned int preset);
-    
-
+    void greeting() ; //strange message, yet we mimic it
     
     // sending data
 
@@ -58,7 +58,8 @@ class SparkIO
     RingBuffer in_chunk;
     int rb_state;
     int rb_len;
-
+    unsigned int expectedSubcmd;
+    
     // message variables (read from chunk read buffer into in_message store - a single message
     // in_mesage_ready is true when there is a full message to read
 
@@ -142,7 +143,6 @@ class SparkIO
     void write_string(const char *str);
     void write_float(float flt);
     void write_onoff(bool onoff);
-
 };
 
 #endif

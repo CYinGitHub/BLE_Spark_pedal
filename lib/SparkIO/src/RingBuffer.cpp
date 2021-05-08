@@ -133,7 +133,7 @@ void RingBuffer::dump2() {
   uint8_t v;
 
   Serial.println();
-  for (i=0; i<len; i++) {
+  for (i=0; i<(len+t_len); i++) {
     v=rb[(st+i) % RB_BUFF_MAX];
     if (v < 16) Serial.print("0");
     Serial.print(v, HEX);

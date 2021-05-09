@@ -1,5 +1,5 @@
 # Easy Spark
-It aint functioning yet, BUT:
+It now can do some basic functions, but it's extremely buggy yet.
 It's gonna be a standalone bluetooth footswitch for Spark amp to use in "performance mode".
 ESP32 based.
 It may have some momentary buttons, and optionally rotary encoders.

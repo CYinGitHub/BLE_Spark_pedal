@@ -7,7 +7,20 @@
 #include "Spark.h"
 #include "SparkIO.h"
 #include "SparkComms.h"
-
+/*  
+      Some explanations
+This project is located here: https://github.com/copych/BT_Spark_pedal
+Initial hardware build included:
+  - DOIT ESP32 DevKit v1
+  - buttons : 4 pcs
+  - rotary encoders : 2pcs
+  - SSD1306 duo-color OLED display
+ 
+presets[]
+ 0,1,2,3 : slots 0x000-0x0003 hardware presets, associated with the amp's buttons
+ 4 : slot 0x01XX (current state) - current preset + all the unsaved editing on the amp
+ 5 : 0x7f - slot used by the app  (and this program) to hold current preset
+*/
 #ifdef SSD1306WIRE //these global def's are in platformio.ini
   #include "SSD1306Wire.h"
 #endif
@@ -27,7 +40,7 @@
 #define DEBUG(x)
 #endif
 
-/* GENERAL AND GLOBALS ======================================================================= */
+// GENERAL AND GLOBALS ======================================================================= 
 #define DISPLAY_SCL 22
 #define DISPLAY_SDA 21
 #define ENCODER2_CLK 4
@@ -73,7 +86,7 @@ uint8_t b;
 
 int i, j, p;
 
-/* Forward declarations ====================================================================== */
+// Forward declarations ======================================================================
 void tempFrame(e_mode tempFrame, e_mode returnFrame, const unsigned long msTimeout) ;
 void returnToMainUI();
 void handleButtonEvent(ace_button::AceButton*, uint8_t, uint8_t);
@@ -86,7 +99,7 @@ void stopWaiting();
 bool blinkOn() {if(round(millis()/400)*400 != round(millis()/300)*300 ) return true; else return false;}
 void updateStatuses();
 
-/* SPARKIE ================================================================================== */
+// SPARKIE ================================================================================== 
 SparkIO spark_io(false); // do NOT do passthru as only one device here, no serial to the app
 SparkComms spark_comms;
 
@@ -101,7 +114,7 @@ int scr_line;
 char str[50];
 
 
-/* BUTTONS Init ============================================================================== */
+// BUTTONS Init ==============================================================================
 struct s_buttons {
   const uint8_t pin;
   const String efxLabel; //don't like String here, but further GUI functiions require Strings, so I don't care :-/
@@ -127,12 +140,12 @@ s_buttons BUTTONS[BUTTONS_NUM] = {
 ace_button::AceButton buttons[BUTTONS_NUM];
 
 
-/* ENCODERS Init ============================================================================= */
+// ENCODERS Init ============================================================================= 
 MD_REncoder Encoder1 = MD_REncoder(ENCODER1_DT, ENCODER1_CLK);
 MD_REncoder Encoder2 = MD_REncoder(ENCODER2_DT, ENCODER2_CLK);
 
 
-/* DISPLAY Init ============================================================================== */
+// DISPLAY Init ============================================================================== 
 #ifdef SSD1306WIRE
   SSD1306Wire  display(0x3c, DISPLAY_SDA , DISPLAY_SCL); //in my case GPIO's are SDA=21 , SCL=22 , addr is 0x3c 
 #endif
@@ -227,13 +240,13 @@ OverlayCallback overlays[] = { screenOverlay };
 int overlaysCount = 1;
 
 
-/* BLUETOOTH Init ============================================================================ */
+// BLUETOOTH Init ============================================================================
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
 #error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
 #endif
 
 
-/* SETUP() WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW */
+// SETUP() WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
 void setup() {  
 #ifdef DEBUG_ENABLE
   Serial.begin(115200);
@@ -282,14 +295,14 @@ void setup() {
   DEBUG("Setup(): done");
 }
 
-/* LOOP() WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW */
+// LOOP() WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW 
 void loop() {
 // Check BT Connection and (RE-)connect if needed
 btConnected = spark_comms.connected();
   if (!btConnected) {
     btConnect();
   } else {
-/* SSSSSSSSSSSSSSSSSS-PPPPPPPPPPPPPPPPP-AAAAAAAAAAAAAAAAA-RRRRRRRRRRRRRRRR-KKKKKKKKKKKKKKKKKKK */
+// SSSSSSSSSSSSSSSSSS-PPPPPPPPPPPPPPPPP-AAAAAAAAAAAAAAAAA-RRRRRRRRRRRRRRRR-KKKKKKKKKKKKKKKKKKK 
     spark_io.process();
     if (spark_io.get_message(&cmdsub, &msg, &preset)) { //there is something there
       sprintf(str, "< %4.4x", cmdsub);
@@ -420,7 +433,7 @@ btConnected = spark_comms.connected();
   
 }
 
-/* CUSTOM FUNCTIONS =============================================================================== */
+// CUSTOM FUNCTIONS =============================================================================== 
 void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t buttonState) {
   uint8_t id = button->getId();
   if (id != 4 && eventType != ace_button::AceButton::kEventLongReleased) {returnToMainUI();}
@@ -482,7 +495,7 @@ void btConnect() {
     ui.update();
     delay(50); //let cores breathe as ESP's delay() has air in it
     ui.update(); // kinda workaround forcing to this frame
-    DEBUG("Connecting...");
+    DEBUG("Connecting... >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
     btConnected =  spark_comms.connect_to_spark();
     // If BT connection with amp is successful
     if (btConnected && spark_comms.bt->hasClient()) {
@@ -536,7 +549,7 @@ void dump_preset(SparkPreset preset) {
   DEBUG(preset.BPM);
 
   for (j=0; j<7; j++) {
-    DEBUG(">>================================");
+    DEBUG(">>===============================");
     DEBUG((String)j + ": " + preset.effects[j].EffectName) ;
     if (preset.effects[j].OnOff == true) DEBUG("On"); else DEBUG ("Off");
     for (i = 0; i < preset.effects[j].NumParameters; i++) {

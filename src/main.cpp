@@ -11,15 +11,15 @@
       Some explanations
 This project is located here: https://github.com/copych/BT_Spark_pedal
 Initial hardware build included:
-  - DOIT ESP32 DevKit v1
+  - DOIT ESP32 DevKit v1 : 1pcs
   - buttons : 4 pcs
   - rotary encoders : 2pcs
-  - SSD1306 duo-color OLED display
+  - SSD1306 duo-color OLED display : 1pcs
  
 presets[]
  0,1,2,3 : slots 0x000-0x0003 hardware presets, associated with the amp's buttons
- 4 : slot 0x01XX (current state) - current preset + all the unsaved editing on the amp
- 5 : 0x7f - slot used by the app  (and this program) to hold current preset
+ 4 : slot 0x007f used by the app (and this program) to hold current preset
+ 5 : slot 0x01XX (current state) - current preset + all the unsaved editing on the amp
 */
 #ifdef SSD1306WIRE //these global def's are in platformio.ini
   #include "SSD1306Wire.h"
@@ -57,7 +57,7 @@ presets[]
 #define FRAME_TIMEOUT 2000 //(ms) to return to main UI from temporary UI frame 
 #define SMALL_FONT ArialMT_Plain_10
 #define HUGE_FONT Roboto_Mono_Medium_52
-
+enum e_amp_presets {HW_PRESET_0,HW_PRESET_1,HW_PRESET_2,HW_PRESET_3,TMP_PRESET,CUR_EDITING};
 enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ABOUT, MODE_LEVEL}; // these numbers also correspond to frame numbers of the UI
 e_mode mode = MODE_CONNECT;
 e_mode returnFrame = MODE_EFFECTS;  
@@ -78,9 +78,9 @@ String ampName="", serialNum="", firmwareVer="" ; //sorry for the Strings, I hop
 unsigned int waitSubcmd=0x0000;
 volatile bool stillWaiting=false;
 unsigned long waitTill;
-String btCaption;
+String btCaption, fxCaption="master";
 
-uint8_t selected_preset;
+uint8_t remotePreset;
 
 uint8_t b;
 
@@ -117,12 +117,12 @@ char str[50];
 // BUTTONS Init ==============================================================================
 struct s_buttons {
   const uint8_t pin;
-  const String efxLabel; //don't like String here, but further GUI functiions require Strings, so I don't care :-/
+  const String fxLabel; //don't like String here, but further GUI functiions require Strings, so I don't care :-/
   const String actLabel;
   const uint8_t ledAddr; //future needs for addressable RGB LEDs
   uint32_t ledState; //data type may change, as i read the docs, enum of selected rgb colors maybe
-  uint8_t efxSlotNumber; // [0-6] number in fx chain
-  bool efxState;
+  uint8_t fxSlotNumber; // [0-6] number in fx chain
+  bool fxState;
 };
 
 const uint8_t BUTTONS_NUM = 6;
@@ -175,14 +175,18 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
   int boxWidth = display->getStringWidth("WWW");
   boxWidth = max(boxWidth,pxPerLabel-2);
   for (int i=0 ; i<PEDALS_NUM; i++) {
-    if (BUTTONS[i].efxState) {
+    if (BUTTONS[i].fxState) {
       display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
     }
-    display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].efxLabel));
+    display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].fxLabel));
   }
-  if (localPreset<=3) {
+  if (localPreset<=4) {
     display->drawRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
-    display->drawString(boxWidth/2 + x,y + 16 ,"HW");
+    if (localPreset==4) {
+      display->drawString(boxWidth/2 + x,y + 16 ,"TMP");
+    } else {
+      display->drawString(boxWidth/2 + x,y + 16 ,"HW");
+    }
   }
   display->setFont(HUGE_FONT);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
@@ -221,7 +225,7 @@ void frameAbout(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
 void frameLevel(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   display->setFont(SMALL_FONT);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString(display->width()/2 + x,  y, "MASTER");
+  display->drawString(display->width()/2 + x,  y, fxCaption);
   
   display->setFont(HUGE_FONT);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
@@ -309,37 +313,44 @@ btConnected = spark_comms.connected();
       DEBUG("From Spark: "  + str);
       if (cmdsub==waitSubcmd) {stopWaiting();}
 
-      if (cmdsub == 0x0301) {
+      if (cmdsub == 0x0301) { //get preset info
         p = preset.preset_num;
         j = preset.curr_preset;
         if (p == 0x007f)       
-          p = 4;
-        if (j == 0x01)
-          p = 5;
+          p = TMP_PRESET;
+        if (j == 0x01) {
+          p = CUR_EDITING;
+        }
         presets[p] = preset;
+        updateStatuses();
         dump_preset(preset);
       }
 
       if (cmdsub == 0x0306) {
-        strcpy(presets[5].effects[3].EffectName, msg.str2);
+        strcpy(presets[CUR_EDITING].effects[3].EffectName, msg.str2);
         DEBUG("Change to amp model ");
-        DEBUG(presets[5].effects[3].EffectName);
+        DEBUG(presets[CUR_EDITING].effects[3].EffectName);
       }
+
       if (cmdsub == 0x0363) {
         DEBUG("Tap Tempo " + msg.val);
       }
+
       if (cmdsub == 0x0337) {
         DEBUG("Change parameter ");
-        DEBUG(msg.str1 +" " + msg.param1+ " " + msg.val);
+        DEBUG(msg.str1 + " " + msg.param1+ " " + msg.val);
+        fxCaption = ((String)(msg.str1) + ": " + (String)msg.param1) ;
+        level = msg.val * 100;
+        tempFrame(MODE_LEVEL,mode,1000);
       }
       
       if (cmdsub == 0x0338) {
-        selected_preset = msg.param2;
-        presets[5] = presets[selected_preset];
-        localPreset = selected_preset;
+        remotePreset = msg.param2;
+        presets[CUR_EDITING] = presets[remotePreset];
+        localPreset = remotePreset;
         updateStatuses();
-        DEBUG("Change to preset: " + selected_preset);
-      }      
+        DEBUG("Change to hw preset: " + remotePreset);
+      }
       
       if (cmdsub == 0x032f) {
         firmwareVer = (String)msg.param1 + "." + (String)msg.param2 + "." + (String)msg.param3 + "." + (String)msg.param4; // I know, I know.. just one time, please =)
@@ -357,11 +368,13 @@ btConnected = spark_comms.connected();
       }
 
       if (cmdsub == 0x0327) {
-        selected_preset = msg.param2;
-        if (selected_preset == 0x7f) 
-          selected_preset=4;
-        presets[selected_preset] = presets[5];
-        DEBUG("Store in preset: " + selected_preset);
+        remotePreset = msg.param2;
+        if (remotePreset == 0x7f) {
+          remotePreset=TMP_PRESET; }
+        localPreset = remotePreset;
+        presets[remotePreset] = presets[CUR_EDITING];
+        DEBUG("Store in preset: " + remotePreset);
+        updateStatuses();
       }
 
       if (cmdsub == 0x0415) {
@@ -369,16 +382,16 @@ btConnected = spark_comms.connected();
         DEBUG("OnOff: ACK");
       }
       if (cmdsub == 0x0310) {
-        selected_preset = msg.param2;
-        localPreset = selected_preset;
+        remotePreset = msg.param2;
         j = msg.param1;
-        if (selected_preset == 0x7f) 
-          selected_preset = 4;
+        if (remotePreset == 0x7f) 
+          remotePreset = TMP_PRESET;
         if (j == 0x01) 
-          selected_preset = 5;
-        presets[5] = presets[selected_preset];
+          remotePreset = CUR_EDITING;
+        localPreset = remotePreset;
+        presets[CUR_EDITING] = presets[remotePreset];
         updateStatuses();
-        DEBUG("Hadware preset is: " + selected_preset);
+        DEBUG("Hadware preset is: " + remotePreset);
       }
     }
 
@@ -416,15 +429,38 @@ btConnected = spark_comms.connected();
         localPreset--;
         if (localPreset<0) localPreset=TOTAL_PRESETS-1;
       }
-      if (localPreset <=3 ) {
+      if (localPreset <= HW_PRESET_3 ) {
         spark_io.change_hardware_preset(localPreset);
       }
-      if (localPreset==4) {
+      if (localPreset==TMP_PRESET ) {
         preset.preset_num = 0x007f;
-        spark_io.create_preset( &preset );
-        waitForResponse(spark_io.expectedSubcmd,1000);
         spark_io.change_hardware_preset(0x007f);
+        if (waitForResponse(spark_io.expectedSubcmd,1000)) {
+          DEBUG("success 0x7f");
+        } else {
+          DEBUG("timed out");
+          spark_io.get_hardware_preset_number();
+          DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
+          waitForResponse(spark_io.expectedSubcmd,2000);
+          spark_io.get_preset_details(0x0100);
+          DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
+          waitForResponse(spark_io.expectedSubcmd,2000);
+        }
       }
+      if (localPreset>TMP_PRESET) {
+        remotePreset = TMP_PRESET;
+        // upload presets from ESP32's filesystem to 0x007f slot
+        // read preset #localPreset from LITTLEFS
+        // change preset.number to 0x007f
+        // create_preset on amp
+        // make it active
+      } else {
+        remotePreset = localPreset;
+      }
+      presets[CUR_EDITING] = presets[remotePreset];
+      updateStatuses();
+      DEBUG("Change to preset: " + remotePreset);
+      updateStatuses();
     }
   }
   if ((millis() > timeToGoBack) && tempUI) {
@@ -445,8 +481,8 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
       case ace_button::AceButton::kEventPressed:
         if (id<PEDALS_NUM) {
           //OnOff
-          spark_io.turn_effect_onoff(presets[localPreset].effects[BUTTONS[id].efxSlotNumber].EffectName, !presets[localPreset].effects[BUTTONS[id].efxSlotNumber].OnOff);
-          presets[localPreset].effects[BUTTONS[id].efxSlotNumber].OnOff = !presets[localPreset].effects[BUTTONS[id].efxSlotNumber].OnOff;
+          spark_io.turn_effect_onoff(presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].EffectName, !presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff);
+          presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff = !presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff;
 
         }
         if (id==4) {
@@ -569,7 +605,7 @@ bool waitForResponse(unsigned int subcmd=0, unsigned long msTimeout=1000) {
     waitTill = msTimeout+millis();
   }
   while (stillWaiting && millis()<waitTill) {  loop(); }
-  if (stillWaiting) return true; else return false;
+  if (stillWaiting) return false; else return true;
 }
 
 void stopWaiting() {
@@ -578,7 +614,7 @@ void stopWaiting() {
 
 void updateStatuses() {
   for (int i=0 ; i< PEDALS_NUM; i++) {
-    BUTTONS[i].efxState = presets[localPreset].effects[BUTTONS[i].efxSlotNumber].OnOff;
+    BUTTONS[i].fxState = presets[CUR_EDITING].effects[BUTTONS[i].fxSlotNumber].OnOff;
   }
 }
 
@@ -613,7 +649,5 @@ void greetings() {
   spark_io.get_preset_details(0x0100);
   DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
   waitForResponse(spark_io.expectedSubcmd,2000);
-  DEBUG(serialNum);
-  DEBUG(firmwareVer);
-  DEBUG(ampName);
+
 }

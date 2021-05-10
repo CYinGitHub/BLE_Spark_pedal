@@ -696,7 +696,7 @@ void SparkIO::change_effect (char *pedal1, char *pedal2)
 void SparkIO::change_hardware_preset (uint8_t preset_num)
 {
   // preset_num is 0 to 3
-  expectedSubcmd = 0x0338;
+  expectedSubcmd = 0x0438;
   start_message (0x0138);
   write_byte (0);
   write_byte (preset_num)  ;     
@@ -782,7 +782,7 @@ void SparkIO::greeting()
 void SparkIO::create_preset(SparkPreset *preset)
 {
   int i, j, siz;
-  expectedSubcmd = 0x0301;
+  expectedSubcmd = 0x0401;
   start_message (0x0101);
 
   write_byte_no_chksum (0x00);

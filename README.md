@@ -6,10 +6,16 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 
 ## Hardware
 It's ESP32 based.
-Its hardware may include some momentary buttons, and optionally rotary encoders.
+Pedal's hardware may include some momentary buttons, and optionally rotary encoders.
 
 ## Wiring
 Coming soon
+
+Hardware in the photos:
+* DOIT ESP32 DevKit v1
+* 4 buttons
+* 2 rotary encoders with buttons
+* SSD1306 duo-color OLED display (just top 16 lines of pixels are always yelow, and the rest are always blue, you can't manage individual pixel color)
 
 ![](/images/2021-05-09%2018-23-49.JPG)
 ![](/images/2021-05-09%2018-24-17.JPG)

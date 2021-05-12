@@ -1,4 +1,11 @@
+#include <Arduino.h>
 #include "Spark.h"
+
+
+typedef struct {
+  int fxSlot;
+  int fxNumber;
+} s_fx_coords;
 
 SparkPreset preset0{0x0,0x7f,"07079063-94A9-41B1-AB1D-02CBC5D00790","Silver Ship","0.7","1-Clean","icon.png",120.000000,{ 
   {"bias.noisegate", false, 3, {0.138313, 0.224643, 0.000000}}, 
@@ -249,3 +256,16 @@ const char spark_knobs[7][5][11] {
   {"DELAY","","","","BPM"}, //delay
   {"REVERB","","","",""}  //reverb
 };    
+
+const s_fx_coords knobs_order[] = {
+  {3,0},
+  {3,3},
+  {3,2},
+  {3,1},
+  {3,4},
+  {4,0},
+  {5,0},
+  {6,0}
+};
+
+const uint8_t knobs_number = 8;

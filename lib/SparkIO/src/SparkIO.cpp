@@ -761,20 +761,12 @@ void SparkIO::get_preset_details(unsigned int preset)
 
 void SparkIO::greeting()
 {
-  // int i; 
-   
   expectedSubcmd = 0x0000;
   start_message (0x0224);
   write_byte(0x00);
   write_byte(0x01);
   write_byte(0x02);
   write_byte(0x03);
-   
-/*
-   for (i=0; i<30; i++) {
-     write_byte(0);
-   }
-*/   
   end_message(); 
 }
 
@@ -969,7 +961,7 @@ void SparkIO::process_out_blocks() {
     out_block[6] = ob_pos;
 
     comms->bt->write(out_block, ob_pos);
-    DEBUG("SparkIO: sending over BT");
+    DEBUG("SparkIO: sending over BT: " + String(cmd*0x100+sub,HEX));
     ob_last_sent_time = millis();
     
     if (!ob_ok_to_send) {

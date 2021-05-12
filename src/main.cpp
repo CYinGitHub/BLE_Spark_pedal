@@ -56,7 +56,7 @@ presets[]
 #define BUTTON3_PIN 27
 #define BUTTON4_PIN 14
 #define TRANSITION_TIME 200 //(ms)
-#define FRAME_TIMEOUT 2000 //(ms) to return to main UI from temporary UI frame 
+#define FRAME_TIMEOUT 3000 //(ms) to return to main UI from temporary UI frame 
 #define SMALL_FONT ArialMT_Plain_10
 #define MID_FONT ArialMT_Plain_16
 #define BIG_FONT ArialMT_Plain_24
@@ -75,21 +75,19 @@ unsigned long countUI = 0;
 unsigned long countBlink = 0;
 bool tempUI = false;
 bool btConnected = false;
+bool tic=false;
 int localPreset;
-int p, j, curFx=3, curParam=4, level = 0;
+int p, j, curKnob=0, curFx=3, curParam=4, level = 0;
 volatile unsigned long timeToGoBack;
 String ampName="", serialNum="", firmwareVer="" ; //sorry for the Strings, I hope this won't crash the pedal =)
 unsigned int waitSubcmd=0x0000;
 volatile bool stillWaiting=false;
 unsigned long waitTill;
-String btCaption, fxCaption="master";
+String btCaption, fxCaption="MASTER";
+volatile ulong safeRecursion=0; 
+ulong testwait; 
 
 uint8_t remotePreset;
-
-typedef struct {
-  int fxSlot;
-  int fxNumber;
-} s_fx_coords;
 
 // Forward declarations ======================================================================
 void tempFrame(e_mode tempFrame, e_mode returnFrame, const unsigned long msTimeout) ;
@@ -265,7 +263,8 @@ int overlaysCount = 1;
 
 
 // SETUP() WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
-void setup() {  
+void setup() {
+testwait=millis() + 7000;
 #ifdef DEBUG_ENABLE
   Serial.begin(115200);
   DEBUG(F("Serial started"));
@@ -315,6 +314,11 @@ void setup() {
 
 // LOOP() WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW 
 void loop() {
+safeRecursion++;
+if (safeRecursion>2) {
+  safeRecursion--;
+  return;
+}
 // Check BT Connection and (RE-)connect if needed
 btConnected = spark_comms.connected();
   if (!btConnected) {
@@ -357,7 +361,7 @@ btConnected = spark_comms.connected();
         DEBUG(msg.str1 + " " + msg.param1+ " " + msg.val);
         int fxSlot = fxNumByName(msg.str1).fxSlot;
         presets[CUR_EDITING].effects[fxSlot].Parameters[msg.param1] = msg.val;
-        fxCaption = spark_knobs [fxSlot] [msg.param1]  ;
+        fxCaption = spark_knobs[fxSlot][msg.param1]  ;
         if (fxSlot==5 && msg.param1==4){
           //suppress the message "BPM=10.0"
         } else {
@@ -427,11 +431,14 @@ btConnected = spark_comms.connected();
 
     uint8_t x ;
     uint16_t s;
-    x = Encoder1.read();
+    x = Encoder1.read(); //fx control
     s = Encoder1.speed();
     if (x) {
+      curFx = knobs_order[curKnob].fxSlot;
+      curParam = knobs_order[curKnob].fxNumber;
+      fxCaption = spark_knobs[curFx][curParam];
       level = presets[CUR_EDITING].effects[curFx].Parameters[curParam] * 100;
-      s = s/7 + 1;
+      s = s/6 + 1;
       tempFrame(MODE_LEVEL,mode,FRAME_TIMEOUT);
       if (x == DIR_CW) {
         level = level + s;
@@ -445,7 +452,7 @@ btConnected = spark_comms.connected();
       spark_io.change_effect_parameter(presets[CUR_EDITING].effects[curFx].EffectName, curParam,  presets[CUR_EDITING].effects[curFx].Parameters[curParam]);
     }
 
-    x = Encoder2.read();
+    x = Encoder2.read(); // preset selector
     if (x) {
       returnToMainUI();
       if (x == DIR_CW) {
@@ -466,10 +473,8 @@ btConnected = spark_comms.connected();
         } else {
           DEBUG("timed out");
           spark_io.get_hardware_preset_number();
-          DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
           waitForResponse(spark_io.expectedSubcmd,2000);
           spark_io.get_preset_details(0x0100);
-          DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
           waitForResponse(spark_io.expectedSubcmd,2000);
         }
       }
@@ -487,22 +492,54 @@ btConnected = spark_comms.connected();
       presets[CUR_EDITING] = presets[remotePreset];
       updateStatuses();
       DEBUG("Change to preset: " + remotePreset);
-      updateStatuses();
     }
   }
   if ((millis() > timeToGoBack) && tempUI) {
     returnToMainUI();
   }
   
+  /*if (btConnected && millis()>testwait) {
+    if (tic) {
+      DEBUG("tic");
+      spark_io.change_effect_parameter(presets[CUR_EDITING].effects[3].EffectName, 4,  0.21);
+      testwait = millis()  + 3000;
+    } else {
+      DEBUG("tac");
+      spark_io.get_preset_details(0x0100);
+      testwait = millis()  + 3000;
+    }
+    tic=!tic;
+  }*/
+  
+  safeRecursion--;
 }
+
+
+
+
 
 // CUSTOM FUNCTIONS =============================================================================== 
 void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t buttonState) {
   uint8_t id = button->getId();
-  if (id != 4 && eventType != ace_button::AceButton::kEventLongReleased) {returnToMainUI();}
+  if (id != 4 && eventType != ace_button::AceButton::kEventLongReleased) {
+    returnToMainUI();
+  } 
   DEBUG("Button: id: " + (String)id + " eventType: " + (String)eventType + "; buttonState: " + (String)buttonState );
 
 //  uint8_t ledPin = BUTTONS[id].ledAddr;
+  if (mode == MODE_LEVEL) {
+    if (id==4 && eventType==ace_button::AceButton::kEventPressed) {
+      curKnob++;
+      if (curKnob>=knobs_number) curKnob=0;
+      
+      curFx = knobs_order[curKnob].fxSlot;
+      curParam = knobs_order[curKnob].fxNumber;
+      fxCaption = spark_knobs[curFx][curParam];
+      level = presets[CUR_EDITING].effects[curFx].Parameters[curParam] * 100;
+      timeToGoBack = millis() + FRAME_TIMEOUT;
+      DEBUG(curKnob);
+    }
+  }
   if (mode==MODE_EFFECTS) {
     switch (eventType) {
       case ace_button::AceButton::kEventPressed:
@@ -596,6 +633,7 @@ void returnToMainUI() {
     ui.switchToFrame(mode);
     timeToGoBack = millis();
     tempUI = false;
+    curKnob = 4;
   }
 }
 
@@ -633,11 +671,17 @@ bool waitForResponse(unsigned int subcmd=0, unsigned long msTimeout=1000) {
     waitTill = msTimeout+millis();
   }
   while (stillWaiting && millis()<waitTill) {  loop(); }
-  if (stillWaiting) return false; else return true;
+  if (stillWaiting) { 
+    DEBUG("No Response! TIMED OUT!");
+    return false;
+  } else {
+    return true;
+  }
 }
 
 void stopWaiting() {
-    stillWaiting = false;
+  //normal case: feedback from the amp
+  stillWaiting = false;
 }
 
 void updateStatuses() {
@@ -650,7 +694,6 @@ void greetings() {
   spark_io.get_name();
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.greeting();
-  waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.get_serial();
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.get_preset_details(0x0000);

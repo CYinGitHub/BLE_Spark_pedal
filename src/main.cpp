@@ -7,13 +7,15 @@
 #include "Spark.h"
 #include "SparkIO.h"
 #include "SparkComms.h"
+#include "SparkPresets.h" // maybe it's not the right place, but....
+
 /*  
       Some explanations
 This project is located here: https://github.com/copych/BT_Spark_pedal
 Initial hardware build included:
   - DOIT ESP32 DevKit v1 : 1pcs
   - buttons : 4 pcs
-  - rotary encoders : 2pcs
+  - pushable rotary encoders : 2pcs
   - SSD1306 duo-color OLED display : 1pcs
  
 presets[]
@@ -35,9 +37,9 @@ presets[]
 #include "LITTLEFS.h"
 
 #ifdef DEBUG_ENABLE
-#define DEBUG(x) Serial.println((String)(millis()/1000) + "s. " + x)
+#define DEBUG(t) Serial.println((String)(millis()/1000) + "s. " + t)
 #else
-#define DEBUG(x)
+#define DEBUG(t)
 #endif
 
 // GENERAL AND GLOBALS ======================================================================= 
@@ -56,13 +58,15 @@ presets[]
 #define TRANSITION_TIME 200 //(ms)
 #define FRAME_TIMEOUT 2000 //(ms) to return to main UI from temporary UI frame 
 #define SMALL_FONT ArialMT_Plain_10
+#define MID_FONT ArialMT_Plain_16
+#define BIG_FONT ArialMT_Plain_24
 #define HUGE_FONT Roboto_Mono_Medium_52
 enum e_amp_presets {HW_PRESET_0,HW_PRESET_1,HW_PRESET_2,HW_PRESET_3,TMP_PRESET,CUR_EDITING};
 enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ABOUT, MODE_LEVEL}; // these numbers also correspond to frame numbers of the UI
 e_mode mode = MODE_CONNECT;
 e_mode returnFrame = MODE_EFFECTS;  
 const char* DEVICE_NAME = "Easy Spark";
-const char* VERSION = "0.1a"; 
+const char* VERSION = "0.2a"; 
 // const char* SPARK_BT_NAME = "Spark 40 Audio";
 const uint8_t TOTAL_PRESETS = 20; // number of stored on board presets
 const uint8_t MAX_LEVEL = 100; // maximum level of effect, actual value in UI is level divided by 100
@@ -72,7 +76,7 @@ unsigned long countBlink = 0;
 bool tempUI = false;
 bool btConnected = false;
 int localPreset;
-int level = 0;
+int p, j, curFx=3, curParam=4, level = 0;
 volatile unsigned long timeToGoBack;
 String ampName="", serialNum="", firmwareVer="" ; //sorry for the Strings, I hope this won't crash the pedal =)
 unsigned int waitSubcmd=0x0000;
@@ -82,9 +86,10 @@ String btCaption, fxCaption="master";
 
 uint8_t remotePreset;
 
-uint8_t b;
-
-int i, j, p;
+typedef struct {
+  int fxSlot;
+  int fxNumber;
+} s_fx_coords;
 
 // Forward declarations ======================================================================
 void tempFrame(e_mode tempFrame, e_mode returnFrame, const unsigned long msTimeout) ;
@@ -98,6 +103,8 @@ bool waitForResponse(unsigned int subcmd, unsigned long msTimeout);
 void stopWaiting();
 bool blinkOn() {if(round(millis()/400)*400 != round(millis()/300)*300 ) return true; else return false;}
 void updateStatuses();
+bool uploadPreset(int localSlotNum);
+s_fx_coords fxNumByName(const char* fxName);
 
 // SPARKIE ================================================================================== 
 SparkIO spark_io(false); // do NOT do passthru as only one device here, no serial to the app
@@ -114,8 +121,9 @@ int scr_line;
 char str[50];
 
 
+
 // BUTTONS Init ==============================================================================
-struct s_buttons {
+typedef struct {
   const uint8_t pin;
   const String fxLabel; //don't like String here, but further GUI functiions require Strings, so I don't care :-/
   const String actLabel;
@@ -123,13 +131,16 @@ struct s_buttons {
   uint32_t ledState; //data type may change, as i read the docs, enum of selected rgb colors maybe
   uint8_t fxSlotNumber; // [0-6] number in fx chain
   bool fxState;
-};
+} s_buttons ;
 
 const uint8_t BUTTONS_NUM = 6;
 const uint8_t PEDALS_NUM = 4; //  first N buttons which are not encoders 
 
 s_buttons BUTTONS[BUTTONS_NUM] = {
+//  {BUTTON_NGT_PIN, "NGT", "xxx", 0, 0, 0, false},
+//  {BUTTON_CMP_PIN, "CMP", "xxx", 0, 0, 1, false},
   {BUTTON1_PIN, "DRV", "DLO", 0, 0, 2, false},
+//  {BUTTON_AMP_PIN, "DRV", "xxx", 0, 0, 3, false},
   {BUTTON2_PIN, "MOD", "SAV", 0, 0, 4, false},
   {BUTTON3_PIN, "DLY", "PRV", 0, 0, 5, false},
   {BUTTON4_PIN, "RVB", "NXT", 0, 0, 6, false},
@@ -209,12 +220,12 @@ void framePresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
 
 void frameAbout(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   if (ampName=="") { // welcome 
-    display->setFont(ArialMT_Plain_16);
+    display->setFont(MID_FONT);
     display->setTextAlignment(TEXT_ALIGN_CENTER);
     display->drawString(display->width()/2 + x, 14 + y, DEVICE_NAME);
     display->drawString(display->width()/2 + x, 36 + y, VERSION);
   } else {
-    display->setFont(ArialMT_Plain_10);
+    display->setFont(SMALL_FONT);
     display->setTextAlignment(TEXT_ALIGN_CENTER);    
     display->drawString(display->width()/2 + x, 0 + y, "amp: " + ampName);
     display->drawString(display->width()/2 + x, 20 + y, "s/n: " + serialNum);
@@ -230,6 +241,9 @@ void frameLevel(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
   display->setFont(HUGE_FONT);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
   sprintf(str,"%3.1f",(float)(level)/10);
+  if(display->getStringWidth(str)>display->width()) {
+    display->setFont(BIG_FONT);
+  }
   display->drawString(64 + x, 11 + y , String(str) );
 } 
 
@@ -334,14 +348,22 @@ btConnected = spark_comms.connected();
 
       if (cmdsub == 0x0363) {
         DEBUG("Tap Tempo " + msg.val);
+        level = msg.val * 10;
+        tempFrame(MODE_LEVEL,mode,1000);
       }
 
       if (cmdsub == 0x0337) {
         DEBUG("Change parameter ");
         DEBUG(msg.str1 + " " + msg.param1+ " " + msg.val);
-        fxCaption = ((String)(msg.str1) + ": " + (String)msg.param1) ;
-        level = msg.val * 100;
-        tempFrame(MODE_LEVEL,mode,1000);
+        int fxSlot = fxNumByName(msg.str1).fxSlot;
+        presets[CUR_EDITING].effects[fxSlot].Parameters[msg.param1] = msg.val;
+        fxCaption = spark_knobs [fxSlot] [msg.param1]  ;
+        if (fxSlot==5 && msg.param1==4){
+          //suppress the message "BPM=10.0"
+        } else {
+          level = msg.val * 100;
+          tempFrame(MODE_LEVEL,mode,1000);
+        }
       }
       
       if (cmdsub == 0x0338) {
@@ -408,8 +430,8 @@ btConnected = spark_comms.connected();
     x = Encoder1.read();
     s = Encoder1.speed();
     if (x) {
+      level = presets[CUR_EDITING].effects[curFx].Parameters[curParam] * 100;
       s = s/7 + 1;
-      //DEBUG((String)s);
       tempFrame(MODE_LEVEL,mode,FRAME_TIMEOUT);
       if (x == DIR_CW) {
         level = level + s;
@@ -418,7 +440,11 @@ btConnected = spark_comms.connected();
         level = level - s;
         if (level<0) level=0;
       }
+      presets[CUR_EDITING].effects[curFx].Parameters[curParam] = (float)(level)/(float)(100);
+      DEBUG(presets[CUR_EDITING].effects[curFx].EffectName + " " + presets[CUR_EDITING].effects[curFx].Parameters[curParam] );
+      spark_io.change_effect_parameter(presets[CUR_EDITING].effects[curFx].EffectName, curParam,  presets[CUR_EDITING].effects[curFx].Parameters[curParam]);
     }
+
     x = Encoder2.read();
     if (x) {
       returnToMainUI();
@@ -450,6 +476,7 @@ btConnected = spark_comms.connected();
       if (localPreset>TMP_PRESET) {
         remotePreset = TMP_PRESET;
         // upload presets from ESP32's filesystem to 0x007f slot
+        uploadPreset(localPreset);
         // read preset #localPreset from LITTLEFS
         // change preset.number to 0x007f
         // create_preset on amp
@@ -597,6 +624,7 @@ void dump_preset(SparkPreset preset) {
 
 //returns true if response received in timely fashion, otherwise returns false (timed out) 
 bool waitForResponse(unsigned int subcmd=0, unsigned long msTimeout=1000) {
+  DEBUG("Wait for response " + String(subcmd, HEX) + " " + msTimeout + "ms");
   waitSubcmd = subcmd;
   if (subcmd==0x0000) { 
     stillWaiting=false;
@@ -620,34 +648,114 @@ void updateStatuses() {
 
 void greetings() {
   spark_io.get_name();
-  DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.greeting();
-  DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.get_serial();
-  DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.get_preset_details(0x0000);
-  DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.get_preset_details(0x0001);
-  DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.get_preset_details(0x0002);
-  DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.get_preset_details(0x0003);
-  DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.get_hardware_preset_number();
-  DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.get_firmware_ver();
-  DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.get_preset_details(0x0100);
-  DEBUG("wait for: " + String(spark_io.expectedSubcmd,HEX));
   waitForResponse(spark_io.expectedSubcmd,2000);
+}
 
+s_fx_coords fxNumByName(const char* fxName) {
+  int i = 0;
+  int j = 3; //3: amp is most often in use 
+  for (const auto &fx: spark_amps) {
+    if (strcmp(fx, fxName)==0){
+      return {j,i};
+    }
+    i++;
+  }
+  for (const auto &fx: spark_amps_addon) {
+    if (strcmp(fx, fxName)==0){
+      return {j,i};
+    }
+    i++;
+  }
+
+  i = 0;
+  j = 4; //4: modulation 
+  for (const auto &fx: spark_modulations) {
+    if (strcmp(fx, fxName)==0){
+      return {j,i};
+    }
+    i++;
+  }
+  for (const auto &fx: spark_modulations_addon) {
+    if (strcmp(fx, fxName)==0){
+      return {j,i};
+    }
+    i++;
+  }
+
+  i = 0;
+  j = 5; // 5: delay
+  for (const auto &fx: spark_delays) {
+    if (strcmp(fx, fxName)==0){
+      return {j,i};
+    }
+    i++;
+  }
+  
+  i = 0;
+  j = 6; // 6: reverb
+  for (const auto &fx: spark_reverbs) {
+    if (strcmp(fx, fxName)==0){
+      return {j,i};
+    }
+    i++;
+  }
+
+  i = 0;
+  j = 2; //2: drive
+  for (const auto &fx: spark_drives) {
+    if (strcmp(fx, fxName)==0){
+      return {j,i};
+    }
+    i++;
+  }
+  for (const auto &fx: spark_drives_addon) {
+    if (strcmp(fx, fxName)==0){
+      return {j,i};
+    }
+    i++;
+  }
+
+  i = 0;
+  j = 1; // 1: compressor
+  for (const auto &fx: spark_compressors) {
+    if (strcmp(fx, fxName)==0){
+      return {j,i};
+    }
+    i++;
+  }
+
+  i = 0;
+  j = 0; //0: noise gate
+  for (const auto &fx: spark_compressors) {
+    if (strcmp(fx, fxName)==0){
+      return {j,i};
+    }
+    i++;
+  }
+
+  return {-1,-1};
+}
+
+
+bool uploadPreset(int localSlotNum) {
+  //
+  return false;
 }

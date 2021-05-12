@@ -683,7 +683,6 @@ void SparkIO::change_effect_parameter (char *pedal, int param, float val)
    end_message();
 }
 
-
 void SparkIO::change_effect (char *pedal1, char *pedal2)
 {
   expectedSubcmd = 0x0306;

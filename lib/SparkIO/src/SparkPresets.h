@@ -216,30 +216,36 @@ SparkPreset preset23{0x0,0x7f,"DEFBB271-B3EE-4C7E-A623-2E5CA53B6DDA","Studio Ses
   {"DelayMono", false, 5, {0.223999, 0.211189, 0.490933, 0.600000, 1.000000}}, 
   {"bias.reverb", true, 7, {0.722819, 0.326169, 0.275776, 0.360714, 0.343944, 0.486025, 0.400000}} },0x23 };
 
-SparkPreset *presets[]{&preset0,  &preset1,  &preset2,  &preset3,  &preset4,  &preset5,  &preset6,  &preset7,  &preset8,  &preset9,  
-                       &preset10, &preset11, &preset12, &preset13, &preset14, &preset15, &preset16, &preset17, &preset18, &preset19, 
-                       &preset20, &preset21, &preset22, &preset23};
+SparkPreset *my_presets[]{&preset0,  &preset1,  &preset2,  &preset3,  &preset4,  &preset5,  &preset6,  &preset7,  &preset8,  &preset9,  
+              &preset10, &preset11, &preset12, &preset13, &preset14, &preset15, &preset16, &preset17, &preset18, &preset19, 
+              &preset20, &preset21, &preset22, &preset23};
 
-char spark_noisegates[][STR_LEN]{"bias.noisegate"};
-char spark_compressors[][STR_LEN]{"LA2AComp", "BlueComp", "Compressor", "BassComp", "BBEOpticalComp"};
-char spark_drives[][STR_LEN]{"Booster", "DistortionTS9", "Overdrive", "Fuzz", "ProCoRat", "BassBigMuff",
-                             "GuitarMuff", "MaestroBassmaster", "SABdriver"};
-char spark_amps[][STR_LEN]{"RolandJC120", "Twin", "ADClean", "94MatchDCV2", "Bassman", "AC Boost", "Checkmate",
-                           "TwoStoneSP50", "Deluxe65", "Plexi", "OverDrivenJM45", "OverDrivenLuxVerb",
-                           "Bogner", "OrangeAD30","AmericanHighGain", "SLO100", "YJM100", "Rectifier",
-                           "EVH", "SwitchAxeLead", "Invader", "BE101", "Acoustic", "AcousticAmpV2", "FatAcousticV2",
-                           "FlatAcoustic", "GK800", "Sunny3000", "W600", "Hammer500"};
-char spark_modulations[][STR_LEN]{"Tremolo", "ChorusAnalog", "Flanger", "Phaser", "Vibrato01", "UniVibe",
-                                  "Cloner", "MiniVibe", "Tremolator", "TremoloSquare"};
-char spark_delays[][STR_LEN]{"DelayMono", "DelayEchoFilt", "VintageDelay", "DelayReverse",
-                             "DelayMultiHead", "DelayRe201"};
-char spark_reverbs[][STR_LEN]{"bias.reverb"};  
-char current_effects[7][STR_LEN]{/* Noisegate  */ "bias.noisegate", 
-                                 /* Compressor */ "LA2AComp",
-                                 /* Drive      */ "Booster",
-                                 /* Amp        */ "RolandJC120", 
-                                 /* Mod        */ "Cloner", 
-                                 /* Delay      */ "Vintage Delay", 
-                                 /* Reverb     */ "bias.reverb"};         
+const char spark_noisegates[][STR_LEN+1]{"bias.noisegate"};
+const char spark_compressors[][STR_LEN+1]{"LA2AComp", "BlueComp", "Compressor", "BassComp", "BBEOpticalComp"};
+const char spark_drives[][STR_LEN+1]{"Booster", "DistortionTS9", "Overdrive", "Fuzz", "ProCoRat", "BassBigMuff",
+              "GuitarMuff", "MaestroBassmaster", "SABdriver"};
+const char spark_drives_addon[][STR_LEN+1]{ "TrebleBooster", "MetalZoneMT2" };
+const char spark_amps[][STR_LEN+1]{"RolandJC120", "Twin", "ADClean", "94MatchDCV2", "Bassman", "AC Boost", "Checkmate",
+              "TwoStoneSP50", "Deluxe65", "Plexi", "OverDrivenJM45", "OverDrivenLuxVerb",
+              "Bogner", "OrangeAD30","AmericanHighGain", "SLO100", "YJM100", "Rectifier",
+              "EVH", "SwitchAxeLead", "Invader", "BE101", "Acoustic", "AcousticAmpV2", "FatAcousticV2",
+              "FlatAcoustic", "GK800", "Sunny3000", "W600", "Hammer500"};
+const char spark_amps_addon[][STR_LEN+1]{ "JCM800","Deluxe57", "JCM900", "MatchlessDC30", "DrZ", "ENGL", "Hiwatt103", "SVT", "PowerAmp",
+              "B15", "Acoustic360", "GK700RBII", "OrangeAD200", "SuperBassman", "AcousticPro", "AcousticImg" };
+const char spark_modulations[][STR_LEN+1]{"Tremolo", "ChorusAnalog", "Flanger", "Phaser", "Vibrato01", "UniVibe",
+              "Cloner", "MiniVibe", "Tremolator", "TremoloSquare"};
+const char spark_modulations_addon[][STR_LEN+1]{ "Leslie01", "MuTron"};
+const char spark_delays[][STR_LEN+1]{"DelayMono", "DelayEchoFilt", "VintageDelay", "DelayReverse",
+              "DelayMultiHead", "DelayRe201"};
+const char spark_reverbs[][STR_LEN+1]{"bias.reverb"};  
 
-                               
+
+const char spark_knobs[7][5][11] {
+  {"","","","",""}, //noise gate
+  {"","","","",""}, //compressor
+  {"","","","",""}, //drive
+  {"GAIN","TREBLE","MID","BASS","MASTER"}, //amp
+  {"MODULATION","","","",""}, //modulation
+  {"DELAY","","","","BPM"}, //delay
+  {"REVERB","","","",""}  //reverb
+};    

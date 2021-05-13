@@ -1,10 +1,10 @@
 # Yet another bluetooth pedal for the PG Spark Amp
 It now can handle some basic functions:
-*One rotary encoder is changing FX parameters like amp's knobs do. Push selects next FX.
-*Another encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet
-*The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
-*Long pressing the first button invokes amp info screen
-*Long pressing the fourth button invokes not-implemented-yet mode ) 
+* One rotary encoder is changing FX parameters like amp's knobs do. Push selects next FX.
+* Another encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet
+* The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
+* Long pressing the first button invokes amp info screen
+* Long pressing the fourth button invokes not-implemented-yet mode ) 
 but it's buggy and cut yet.
 It's gonna be a standalone bluetooth footswitch for Spark amp to use in "gig mode", ie to switch between tones (4 stored within the amp, and a reasonable number, say 20, 50 or 100 of presets stored in on-board flash), or just turn On/Off effects inside a tone with just one tap.
 

@@ -1,6 +1,6 @@
 # Yet another bluetooth pedal for the PG Spark Amp
 It now can handle some basic functions:
-* One rotary encoder is changing FX parameters like amp's knobs do. Push selects next FX.
+* One rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX
 * Another encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet
 * The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
 * Long pressing the first button invokes amp info screen

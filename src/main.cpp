@@ -45,67 +45,65 @@ presets[]
 // GENERAL AND GLOBALS ======================================================================= 
 #define DISPLAY_SCL 22
 #define DISPLAY_SDA 21
-#define ENCODER2_CLK 4
-#define ENCODER2_DT 16
-#define ENCODER2_SW 17
 #define ENCODER1_CLK 5
 #define ENCODER1_DT 18
 #define ENCODER1_SW 19
+#define ENCODER2_CLK 4
+#define ENCODER2_DT 16
+#define ENCODER2_SW 17
 #define BUTTON1_PIN 25
 #define BUTTON2_PIN 26
 #define BUTTON3_PIN 27
 #define BUTTON4_PIN 14
-#define TRANSITION_TIME 200 //(ms)
+#define TRANSITION_TIME 200 //(ms) ui slide effect timing
 #define FRAME_TIMEOUT 3000 //(ms) to return to main UI from temporary UI frame 
 #define SMALL_FONT ArialMT_Plain_10
 #define MID_FONT ArialMT_Plain_16
 #define BIG_FONT ArialMT_Plain_24
 #define HUGE_FONT Roboto_Mono_Medium_52
+
+// a lot of globals, I know it's not that much elegant 
 enum e_amp_presets {HW_PRESET_0,HW_PRESET_1,HW_PRESET_2,HW_PRESET_3,TMP_PRESET,CUR_EDITING, TMP_PRESET_ADDR=0x007f};
-enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ABOUT, MODE_LEVEL}; // these numbers also correspond to frame numbers of the UI
+enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ABOUT, MODE_LEVEL}; // these numbers correspond to frame numbers of the UI
 e_mode mode = MODE_CONNECT;
-e_mode returnFrame = MODE_EFFECTS;  
+e_mode returnFrame = MODE_EFFECTS;  // we should memorize where to return
 const char* DEVICE_NAME = "Pedal for Spark";
 const char* VERSION = "0.5a"; 
-// const char* SPARK_BT_NAME = "Spark 40 Audio";
 const uint8_t TOTAL_PRESETS = 4 + 24 ; // 4hardware + number of stored on board presets
 const uint8_t MAX_LEVEL = 100; // maximum level of effect, actual value in UI is level divided by 100
-unsigned long countBT = 0;
-unsigned long countUI = 0;
-unsigned long countBlink = 0;
-bool tempUI = false;
 bool btConnected = false;
-bool tic=true;
-int scroller=0, scrollStep = -2;
-ulong nextScroll, idleTimer; 
-int localPresetNum;
-int p, j, curKnob=0, curFx=3, curParam=4, level = 0;
-volatile unsigned long timeToGoBack;
-String ampName="", serialNum="", firmwareVer="" ; //sorry for the Strings, I hope this won't crash the pedal =)
-unsigned int waitSubcmd=0x0000;
+int scroller=0, scrollStep = -2; // speed of scrolling tone names
+ulong scrollCounter;
+ulong idleCounter; // for pending tone change 
+ulong waitCounter;
+ulong uiCounter = 0;
+volatile ulong timeToGoBack;
 volatile bool stillWaiting=false;
-unsigned long waitTill;
-int pendingPresetNum = -1 ;
+unsigned int waitSubcmd=0x0000;
+bool tempUI = false;
+int p, j, curKnob=0, curFx=3, curParam=4, level = 0;
+String ampName="", serialNum="", firmwareVer="" ; //sorry for the Strings, I hope this won't crash the pedal =)
 String btCaption, fxCaption="MASTER";
-volatile ulong safeRecursion=0; 
-
+volatile ulong safeRecursion=0;
+int pendingPresetNum = -1 ;
+int localPresetNum; 
 uint8_t remotePresetNum;
 
 // Forward declarations ======================================================================
-void tempFrame(e_mode tempFrame, e_mode returnFrame, const unsigned long msTimeout) ;
+void tempFrame(e_mode tempFrame, e_mode returnFrame, const ulong msTimeout) ;
 void returnToMainUI();
 void handleButtonEvent(ace_button::AceButton*, uint8_t, uint8_t);
 void btConnect();
 void btInit();
 void dump_preset(SparkPreset);
 void greetings();
-bool waitForResponse(unsigned int subcmd, unsigned long msTimeout);
+bool waitForResponse(unsigned int subcmd, ulong msTimeout);
 void stopWaiting();
 bool blinkOn() {if(round(millis()/400)*400 != round(millis()/300)*300 ) return true; else return false;}
 bool triggedOn() {if(round(millis()/2000)*2000 != round(millis()/1000)*1000 ) return true; else return false;}
 void setPendingPreset(int localNum);
 void updateStatuses();
-bool uploadPreset(int localNum);
+void uploadPreset(int localNum);
 s_fx_coords fxNumByName(const char* fxName);
 
 // SPARKIE ================================================================================== 
@@ -117,7 +115,7 @@ SparkMessage msg;
 SparkPreset preset;
 SparkPreset presets[6];
 
-unsigned long last_millis;
+ulong last_millis;
 int my_state;
 int scr_line;
 char str[50];
@@ -207,12 +205,12 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
     if (s1w+s2w <= display->width()) {
       scroller = ( display->width() - s1w - s2w ) / 2;
     } else {
-      if ( millis() > nextScroll ) {
+      if ( millis() > scrollCounter ) {
         scroller = scroller + scrollStep;
         if (scroller < (int)(display->width())-s1w-s2w-s1w-s2w) {
           scroller = scroller + s1w + s2w;
         }
-        nextScroll = millis() + 20;
+        scrollCounter = millis() + 20;
       }
       display->setFont(HUGE_FONT);
       display->drawString( x + scroller + s1w + s2w, 11 + y, String(localPresetNum + 1) ); // +1 for humans
@@ -457,8 +455,8 @@ btConnected = spark_comms.connected();
     }
 
 
-    if (millis() > countUI ) {
-      countUI = ui.update() + millis();
+    if (millis() > uiCounter ) {
+      uiCounter = ui.update() + millis();
     }
     for (uint8_t i = 0; i < BUTTONS_NUM; i++) {
       buttons[i].check();
@@ -508,7 +506,7 @@ btConnected = spark_comms.connected();
       DEBUG("Pending preset: " + localPresetNum + " to " + String(remotePresetNum,HEX));
       updateStatuses();
     }
-    if (millis() > idleTimer && pendingPresetNum >= 0) {
+    if (millis() > idleCounter && pendingPresetNum >= 0) {
       uploadPreset(localPresetNum);
     }
   }
@@ -623,7 +621,7 @@ void btConnect() {
   }
 }
 
-void tempFrame(e_mode tempFrame, e_mode retFrame, const unsigned long msTimeout) {
+void tempFrame(e_mode tempFrame, e_mode retFrame, const ulong msTimeout) {
   if (!tempUI) {
     mode = tempFrame;
     ui.switchToFrame(mode);
@@ -667,16 +665,16 @@ void dump_preset(SparkPreset preset) {
 }
 
 //returns true if response received in timely fashion, otherwise returns false (timed out) 
-bool waitForResponse(unsigned int subcmd=0, unsigned long msTimeout=1000) {
+bool waitForResponse(unsigned int subcmd=0, ulong msTimeout=1000) {
   DEBUG("Wait for response " + String(subcmd, HEX) + " " + msTimeout + "ms");
   waitSubcmd = subcmd;
   if (subcmd==0x0000) { 
     stillWaiting=false;
   } else {
     stillWaiting=true;
-    waitTill = msTimeout+millis();
+    waitCounter = msTimeout+millis();
   }
-  while (stillWaiting && millis()<waitTill) {  loop(); }
+  while (stillWaiting && millis()<waitCounter) {  loop(); }
   if (stillWaiting) { 
     DEBUG("No Response! TIMED OUT!");
     return false;
@@ -715,7 +713,9 @@ void greetings() {
   spark_io.get_firmware_ver();
   waitForResponse(spark_io.expectedSubcmd,2000);
   spark_io.get_preset_details(0x0100);
-  waitForResponse(spark_io.expectedSubcmd,2000);
+  if (!waitForResponse(spark_io.expectedSubcmd,2000)) {
+    // Spark might have been stuck
+  };
 }
 
 s_fx_coords fxNumByName(const char* fxName) {
@@ -804,10 +804,10 @@ s_fx_coords fxNumByName(const char* fxName) {
 
 void setPendingPreset(int presetNum) {
     pendingPresetNum = presetNum;
-    idleTimer = millis() + 600 ; // let's make some idle check before sending the preset to the amp
+    idleCounter = millis() + 600 ; // let's make some idle check before sending the preset to the amp
 }
 
-bool uploadPreset(int presetNum) {
+void uploadPreset(int presetNum) {
   localPresetNum = presetNum;
   if (presetNum <= HW_PRESET_3 ) {
     spark_io.change_hardware_preset(presetNum);
@@ -828,6 +828,6 @@ bool uploadPreset(int presetNum) {
     // make it active
     spark_io.change_hardware_preset(TMP_PRESET_ADDR);
   }
+  updateStatuses();
   pendingPresetNum = -1;
-  return false;
 }

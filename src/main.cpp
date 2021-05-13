@@ -65,7 +65,7 @@ enum e_amp_presets {HW_PRESET_0,HW_PRESET_1,HW_PRESET_2,HW_PRESET_3,TMP_PRESET,C
 enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ABOUT, MODE_LEVEL}; // these numbers also correspond to frame numbers of the UI
 e_mode mode = MODE_CONNECT;
 e_mode returnFrame = MODE_EFFECTS;  
-const char* DEVICE_NAME = "Easy Spark";
+const char* DEVICE_NAME = "Pedal for Spark";
 const char* VERSION = "0.5a"; 
 // const char* SPARK_BT_NAME = "Spark 40 Audio";
 const uint8_t TOTAL_PRESETS = 4 + 24 ; // 4hardware + number of stored on board presets
@@ -76,19 +76,20 @@ unsigned long countBlink = 0;
 bool tempUI = false;
 bool btConnected = false;
 bool tic=true;
-int scroller=0, scrollStep = 1;
-ulong nextScroll; 
-int localPreset;
+int scroller=0, scrollStep = -2;
+ulong nextScroll, idleTimer; 
+int localPresetNum;
 int p, j, curKnob=0, curFx=3, curParam=4, level = 0;
 volatile unsigned long timeToGoBack;
 String ampName="", serialNum="", firmwareVer="" ; //sorry for the Strings, I hope this won't crash the pedal =)
 unsigned int waitSubcmd=0x0000;
 volatile bool stillWaiting=false;
 unsigned long waitTill;
+int pendingPresetNum = -1 ;
 String btCaption, fxCaption="MASTER";
 volatile ulong safeRecursion=0; 
 
-uint8_t remotePreset;
+uint8_t remotePresetNum;
 
 // Forward declarations ======================================================================
 void tempFrame(e_mode tempFrame, e_mode returnFrame, const unsigned long msTimeout) ;
@@ -102,7 +103,7 @@ bool waitForResponse(unsigned int subcmd, unsigned long msTimeout);
 void stopWaiting();
 bool blinkOn() {if(round(millis()/400)*400 != round(millis()/300)*300 ) return true; else return false;}
 bool triggedOn() {if(round(millis()/2000)*2000 != round(millis()/1000)*1000 ) return true; else return false;}
-
+void setPendingPreset(int localNum);
 void updateStatuses();
 bool uploadPreset(int localNum);
 s_fx_coords fxNumByName(const char* fxName);
@@ -141,7 +142,7 @@ s_buttons BUTTONS[BUTTONS_NUM] = {
 //  {BUTTON_NGT_PIN, "NGT", "xxx", 0, 0, 0, false},
 //  {BUTTON_CMP_PIN, "CMP", "xxx", 0, 0, 1, false},
   {BUTTON1_PIN, "DRV", "DLO", 0, 0, 2, false},
-//  {BUTTON_AMP_PIN, "DRV", "xxx", 0, 0, 3, false},
+//  {BUTTON_AMP_PIN, "AMP", "xxx", 0, 0, 3, false},
   {BUTTON2_PIN, "MOD", "SAV", 0, 0, 4, false},
   {BUTTON3_PIN, "DLY", "PRV", 0, 0, 5, false},
   {BUTTON4_PIN, "RVB", "NXT", 0, 0, 6, false},
@@ -193,31 +194,40 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
     }
     display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].fxLabel));
   }
-  if (localPreset<=HW_PRESET_3) {
+  if (localPresetNum<=HW_PRESET_3) {
     display->drawRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
     display->drawString(boxWidth/2 + x,y + 16 ,"HW");
   }
-
-  display->setFont(HUGE_FONT);
-  int s1w = display->getStringWidth(String(localPreset + 1));
-  display->setFont(BIG_FONT);
-  int s2w = display->getStringWidth(presets[CUR_EDITING].Name);
-  if (s1w+s2w <= display->width()) {
-    scroller = ( display->width()-s1w-s2w ) / 2;
-  } else {
-    if ( millis() > nextScroll ) {
-      scroller = scroller + scrollStep;
-      if (scroller > 0 || scroller < (int)(display->width())-s1w-s2w) {
-        scrollStep = -scrollStep;
+  if (pendingPresetNum < 0) {
+    display->setTextAlignment(TEXT_ALIGN_LEFT);
+    display->setFont(HUGE_FONT);
+    int s1w = display->getStringWidth(String(localPresetNum + 1))+5;
+    display->setFont(BIG_FONT);
+    int s2w = display->getStringWidth(presets[CUR_EDITING].Name)+5;
+    if (s1w+s2w <= display->width()) {
+      scroller = ( display->width() - s1w - s2w ) / 2;
+    } else {
+      if ( millis() > nextScroll ) {
+        scroller = scroller + scrollStep;
+        if (scroller < (int)(display->width())-s1w-s2w-s1w-s2w) {
+          scroller = scroller + s1w + s2w;
+        }
+        nextScroll = millis() + 20;
       }
-      nextScroll = millis() + 10;
+      display->setFont(HUGE_FONT);
+      display->drawString( x + scroller + s1w + s2w, 11 + y, String(localPresetNum + 1) ); // +1 for humans
+      display->setFont(BIG_FONT);
+      display->drawString(x + scroller + s1w + s2w + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
     }
+    display->setFont(HUGE_FONT);
+    display->drawString( x + scroller, 11 + y, String(localPresetNum + 1) ); // +1 for humans
+    display->setFont(BIG_FONT);
+    display->drawString(x + scroller + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
+  } else {
+    display->setFont(HUGE_FONT);
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    display->drawString(64 + x, 11 + y, String(localPresetNum+1) );
   }
-  display->setTextAlignment(TEXT_ALIGN_LEFT);
-  display->setFont(HUGE_FONT);
-  display->drawString( x + scroller, 11 + y, String(localPreset + 1) ); // +1 for humans
-  display->setFont(BIG_FONT);
-  display->drawString(x + scroller + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
 }
 
 void framePresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
@@ -231,7 +241,7 @@ void framePresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
   }
   display->setFont(HUGE_FONT);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString(64 + x, 11 + y, String(localPreset) );
+  display->drawString(64 + x, 11 + y, String(localPresetNum+1) );
 }
 
 void frameAbout(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
@@ -281,12 +291,10 @@ int overlaysCount = 1;
 
 
 // SETUP() WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
-void setup() {
-#ifdef DEBUG_ENABLE
+void setup() { 
   Serial.begin(115200);
-  DEBUG(F("Serial started"));
-#endif  
-  localPreset = 1;
+  DEBUG(F("Serial started")); 
+  localPresetNum = 1;
   ui.setTargetFPS(30);
   ui.disableAllIndicators();
   ui.setFrameAnimation(SLIDE_LEFT);
@@ -388,16 +396,16 @@ btConnected = spark_comms.connected();
       }
       
       if (cmdsub == 0x0338) { // >0x0138 or amp button
-        remotePreset = msg.param2;
-        if (remotePreset<=HW_PRESET_3){
-          localPreset = remotePreset;
-          presets[CUR_EDITING] = presets[remotePreset];
+        remotePresetNum = msg.param2;
+        if (remotePresetNum<=HW_PRESET_3){
+          localPresetNum = remotePresetNum;
+          presets[CUR_EDITING] = presets[remotePresetNum];
         }
-        if (remotePreset == TMP_PRESET_ADDR) {
+        if (remotePresetNum == TMP_PRESET_ADDR) {
           //
         }
         updateStatuses();
-        DEBUG("Change to hw preset: " + remotePreset);
+        DEBUG("Change to hw preset: " + remotePresetNum);
       }
       
       if (cmdsub == 0x032f) {
@@ -416,17 +424,17 @@ btConnected = spark_comms.connected();
       }
 
       if (cmdsub == 0x0327) {
-        remotePreset = msg.param2;
-        if (remotePreset <= HW_PRESET_3) {
-          localPreset = remotePreset;
-          spark_io.get_preset_details(remotePreset);
+        remotePresetNum = msg.param2;
+        if (remotePresetNum <= HW_PRESET_3) {
+          localPresetNum = remotePresetNum;
+          spark_io.get_preset_details(remotePresetNum);
           waitForResponse(spark_io.expectedSubcmd,1000);
-          presets[CUR_EDITING] = presets[remotePreset];
+          presets[CUR_EDITING] = presets[remotePresetNum];
         }
-        if (remotePreset == 0x7f) { 
+        if (remotePresetNum == 0x7f) { 
 
         }
-        DEBUG("Store in preset: " + remotePreset);
+        DEBUG("Store in preset: " + remotePresetNum);
         updateStatuses();
       }
 
@@ -435,16 +443,16 @@ btConnected = spark_comms.connected();
         DEBUG("OnOff: ACK");
       }
       if (cmdsub == 0x0310) {
-        remotePreset = msg.param2;
+        remotePresetNum = msg.param2;
         j = msg.param1;
-        if (remotePreset == 0x7f) 
-          remotePreset = TMP_PRESET;
+        if (remotePresetNum == 0x7f) 
+          remotePresetNum = TMP_PRESET;
         if (j == 0x01) 
-          remotePreset = CUR_EDITING;
-        localPreset = remotePreset;
-        presets[CUR_EDITING] = presets[remotePreset];
+          remotePresetNum = CUR_EDITING;
+        localPresetNum = remotePresetNum;
+        presets[CUR_EDITING] = presets[remotePresetNum];
         updateStatuses();
-        DEBUG("Hadware preset is: " + remotePreset);
+        DEBUG("Hadware preset is: " + remotePresetNum);
       }
     }
 
@@ -482,44 +490,31 @@ btConnected = spark_comms.connected();
     x = Encoder2.read(); // preset selector
     if (x) {
       scroller = 0;
-      scrollStep = abs(scrollStep);
+      scrollStep = -abs(scrollStep);
       returnToMainUI();
       if (x == DIR_CW) {
-        localPreset++;
-        if (localPreset>TOTAL_PRESETS-1) localPreset = 0;
+        localPresetNum++;
+        if (localPresetNum>TOTAL_PRESETS-1) localPresetNum = 0;
       } else {
-        localPreset--;
-        if (localPreset<0) localPreset=TOTAL_PRESETS-1;
+        localPresetNum--;
+        if (localPresetNum<0) localPresetNum=TOTAL_PRESETS-1;
       }
-      if (localPreset <= HW_PRESET_3 ) {
-        spark_io.change_hardware_preset(localPreset);
-        remotePreset = localPreset;
+      if (localPresetNum <= HW_PRESET_3 ) {
+        remotePresetNum = localPresetNum;
       } else {
-        remotePreset = TMP_PRESET_ADDR;
-        // upload presets from ESP32's filesystem to TMP_PRESET_ADDR slot
-        uploadPreset(localPreset);
-        presets[CUR_EDITING] = presets[TMP_PRESET];
+        remotePresetNum = TMP_PRESET_ADDR;
       }
+      setPendingPreset(localPresetNum);
+      DEBUG("Pending preset: " + localPresetNum + " to " + String(remotePresetNum,HEX));
       updateStatuses();
-      DEBUG("Change to preset: " + String(remotePreset,HEX));
+    }
+    if (millis() > idleTimer && pendingPresetNum >= 0) {
+      uploadPreset(localPresetNum);
     }
   }
   if ((millis() > timeToGoBack) && tempUI) {
     returnToMainUI();
   }
-  
-  /*if (btConnected && millis()>testwait) {
-    if (tic) {
-      DEBUG("tic");
-      spark_io.change_effect_parameter(presets[CUR_EDITING].effects[3].EffectName, 4,  0.21);
-      testwait = millis()  + 3000;
-    } else {
-      DEBUG("tac");
-      spark_io.get_preset_details(0x0100);
-      testwait = millis()  + 3000;
-    }
-    tic=!tic;
-  }*/
   
   safeRecursion--;
 }
@@ -807,18 +802,32 @@ s_fx_coords fxNumByName(const char* fxName) {
   return {-1,-1};
 }
 
+void setPendingPreset(int presetNum) {
+    pendingPresetNum = presetNum;
+    idleTimer = millis() + 600 ; // let's make some idle check before sending the preset to the amp
+}
 
-bool uploadPreset(int localNum) {
-  // TODO read preset #localPreset from LITTLEFS
-  preset = *my_presets[localNum-HW_PRESET_3-1];
-  DEBUG(">>>>>uploading " + preset.Name + " to 0x007f");
-  // change preset.number to 0x007f
-  preset.preset_num = TMP_PRESET_ADDR;
-  presets[TMP_PRESET] = preset;
-  presets[CUR_EDITING] = preset;
-  // create_preset on amp
-  spark_io.create_preset(&preset);
-  // make it active
-  spark_io.change_hardware_preset(TMP_PRESET_ADDR);
+bool uploadPreset(int presetNum) {
+  localPresetNum = presetNum;
+  if (presetNum <= HW_PRESET_3 ) {
+    spark_io.change_hardware_preset(presetNum);
+    remotePresetNum = presetNum;
+    presets[CUR_EDITING] = presets[presetNum];
+  } else {
+    remotePresetNum = TMP_PRESET_ADDR;
+    // upload presets from ESP32's filesystem to TMP_PRESET_ADDR slot
+    // TODO read preset #localPresetNum from LITTLEFS
+    preset = *my_presets[presetNum-HW_PRESET_3-1];
+    DEBUG(">>>>>uploading '" + preset.Name + "' to 0x007f");
+    // change preset.number to 0x007f
+    preset.preset_num = TMP_PRESET_ADDR;
+    presets[TMP_PRESET] = preset;
+    presets[CUR_EDITING] = preset;
+    // create_preset on amp
+    spark_io.create_preset(&preset);
+    // make it active
+    spark_io.change_hardware_preset(TMP_PRESET_ADDR);
+  }
+  pendingPresetNum = -1;
   return false;
 }

@@ -20,7 +20,7 @@ Initial hardware build included:
  
 presets[]
  0,1,2,3 : slots 0x000-0x0003 hardware presets, associated with the amp's buttons
- 4 : slot TMP_PRESET_ADDR used by the app (and this program) to hold current preset
+ 4 : slot 0x007f used by the app (and this program) to hold current preset
  5 : slot 0x01XX (current state) - current preset + all the unsaved editing on the amp
 */
 #ifdef SSD1306WIRE //these global def's are in platformio.ini
@@ -76,6 +76,8 @@ unsigned long countBlink = 0;
 bool tempUI = false;
 bool btConnected = false;
 bool tic=true;
+int scroller=0, scrollStep = 1;
+ulong nextScroll; 
 int localPreset;
 int p, j, curKnob=0, curFx=3, curParam=4, level = 0;
 volatile unsigned long timeToGoBack;
@@ -85,7 +87,6 @@ volatile bool stillWaiting=false;
 unsigned long waitTill;
 String btCaption, fxCaption="MASTER";
 volatile ulong safeRecursion=0; 
-ulong testwait; 
 
 uint8_t remotePreset;
 
@@ -196,15 +197,27 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
     display->drawRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
     display->drawString(boxWidth/2 + x,y + 16 ,"HW");
   }
-  if (triggedOn()) {
-    display->setFont(HUGE_FONT);
-    display->setTextAlignment(TEXT_ALIGN_CENTER);
-    display->drawString(64 + x, 11 + y, String(localPreset + 1) ); // +1 for humans
+
+  display->setFont(HUGE_FONT);
+  int s1w = display->getStringWidth(String(localPreset + 1));
+  display->setFont(BIG_FONT);
+  int s2w = display->getStringWidth(presets[CUR_EDITING].Name);
+  if (s1w+s2w <= display->width()) {
+    scroller = ( display->width()-s1w-s2w ) / 2;
   } else {
-    display->setFont(MID_FONT);
-    display->setTextAlignment(TEXT_ALIGN_CENTER);
-    display->drawString(x + display->width()/2, y + display->height()/2 ,presets[CUR_EDITING].Name);
+    if ( millis() > nextScroll ) {
+      scroller = scroller + scrollStep;
+      if (scroller > 0 || scroller < (int)(display->width())-s1w-s2w) {
+        scrollStep = -scrollStep;
+      }
+      nextScroll = millis() + 10;
+    }
   }
+  display->setTextAlignment(TEXT_ALIGN_LEFT);
+  display->setFont(HUGE_FONT);
+  display->drawString( x + scroller, 11 + y, String(localPreset + 1) ); // +1 for humans
+  display->setFont(BIG_FONT);
+  display->drawString(x + scroller + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
 }
 
 void framePresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
@@ -468,6 +481,8 @@ btConnected = spark_comms.connected();
 
     x = Encoder2.read(); // preset selector
     if (x) {
+      scroller = 0;
+      scrollStep = abs(scrollStep);
       returnToMainUI();
       if (x == DIR_CW) {
         localPreset++;

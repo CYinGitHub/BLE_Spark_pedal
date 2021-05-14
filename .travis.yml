@@ -9,7 +9,8 @@ cache:
         - "~/.platformio"
         - $HOME/.cache/pip
 env:
-  - PLATFORMIO_CI_SRC=src/main.cpp
+  - PLATFORMIO_CI_SRC=src/main.cpp  
+  - PLATFORMIO_CI_SRC=lib/SparkIO/Spark.h
   
 install:
     - pip install -U platformio

@@ -3,12 +3,11 @@
 [![](https://www.travis-ci.com/copych/BT_Spark_pedal.svg?branch=master)](https://www.travis-ci.com/github/copych/BT_Spark_pedal)
 
 It now can handle some basic functions:
-
-* One rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX
-* Another encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet
-* The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
-* Long pressing the first button invokes amp info screen
-* Long pressing the fourth button invokes not-implemented-yet mode ) 
+*  One rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX
+*  Another encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet
+*  The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
+*  Long pressing the first button invokes amp info screen
+*  Long pressing the fourth button invokes not-implemented-yet mode ) 
 but it's buggy and cut yet.
 
 It's gonna be a standalone bluetooth footswitch for Spark amp to use in "gig mode", ie to switch between tones (4 stored within the amp, and a reasonable number, say 20, 50 or 100 of presets stored in on-board flash), or just turn On/Off effects inside a tone with just one tap.
@@ -16,7 +15,6 @@ It's gonna be a standalone bluetooth footswitch for Spark amp to use in "gig mod
 These presets will probably be accessible via the on-board web server thru WiFi connection (AP/Infrastructure mode). Or in some other way.
 
 ## ToDo
-
 - [ ] Total bypass: switching all the effects OFF and then return to the previous state
 - [ ] Storing presets in ESP's filesystem
 - [ ] Accessing presets thru web-based UI via WiFi

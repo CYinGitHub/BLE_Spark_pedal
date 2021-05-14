@@ -16,10 +16,10 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 
 ## ToDo
 
-  -[ ] Total bypass: switching all the effects OFF and then return to the previous state
-  -[ ] Storing presets in ESP's filesystem
-  -[ ] Accessing presets thru web-based UI via WiFi
-  -[ ] (?) "Scenes" mode. Remember the setups within one Tone and map them to the buttons. Switching between such scenes should be (or not: subject to test) fast enough to perform live.
+- [ ] Total bypass: switching all the effects OFF and then return to the previous state
+- [ ] Storing presets in ESP's filesystem
+- [ ] Accessing presets thru web-based UI via WiFi
+- [ ] (?) "Scenes" mode. Remember the setups within one Tone and map them to the buttons. Switching between such scenes should be (or not: subject to test) fast enough to perform live.
 
 ## Hardware
 

@@ -1,0 +1,21 @@
+language: python
+python:
+  - "3.6"
+  
+# Cache PlatformIO packages using Travis CI container-based infrastructure
+sudo: false
+cache:
+    directories:
+        - "~/.platformio"
+        - $HOME/.cache/pip
+env:
+  - PLATFORMIO_CI_SRC=src/main.cpp
+  
+install:
+    - pip install -U platformio
+    - pio update
+
+script:
+  - platformio ci --project-conf=platformio.ini
+    
+    

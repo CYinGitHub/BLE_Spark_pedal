@@ -4,10 +4,10 @@
 #include "AceButton.h"
 #include "MD_REncoder.h"
 // Spark*.* is a portion from Paul Hamshere https://github.com/paulhamsh/
-#include <Spark.h>
-#include <SparkIO.h>
-#include <SparkComms.h>
-#include <SparkPresets.h> // maybe it's not the right place, but....
+#include "Spark.h"
+#include "SparkIO.h"
+#include "SparkComms.h"
+#include "SparkPresets.h" // maybe it's not the right place, but....
 
 /*  
       Some explanations

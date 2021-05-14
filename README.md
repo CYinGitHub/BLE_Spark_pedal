@@ -1,4 +1,6 @@
-# Bluetooth pedal for the PG Spark Amp [![](https://www.travis-ci.com/copych/BT_Spark_pedal.svg?branch=master)](https://www.travis-ci.com/github/copych/BT_Spark_pedal)
+# Bluetooth pedal for the PG Spark Amp 
+
+[![](https://www.travis-ci.com/copych/BT_Spark_pedal.svg?branch=master)](https://www.travis-ci.com/github/copych/BT_Spark_pedal)
 It now can handle some basic functions:
 * One rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX
 * Another encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet

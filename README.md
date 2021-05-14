@@ -14,6 +14,13 @@ It's gonna be a standalone bluetooth footswitch for Spark amp to use in "gig mod
 
 These presets will probably be accessible via the on-board web server thru WiFi connection (AP/Infrastructure mode). Or in some other way.
 
+## ToDo
+
+* Total bypass: switching all the effects OFF and then return to the previous state
+* Storing presets in ESP's filesystem
+* Accessing presets thru web-based UI via WiFi
+* (?) "Scenes" mode. Remember the setups within one Tone and map them to the buttons. Switching between such scenes should be (or not: subject to test) fast enough to perform live.
+
 ## Hardware
 
 Wiring: Coming soon
@@ -26,14 +33,6 @@ Hardware in the photos:
 
 ![](/images/2021-05-09%2018-23-49.JPG)
 ![](/images/2021-05-09%2018-24-17.JPG)
-
-## ToDo
-
-* Total bypass: switching all the effects OFF and then return to the previous state
-* Storing presets in ESP's filesystem
-* Accessing presets thru web-based UI via WiFi
-* (?) "Scenes" mode. Remember the setups within one Tone and map them to the buttons. Switching between such scenes should be (or not: subject to test) fast enough to perform live.
-
 
 ## Credits/Thanks
 * PositiveGrid for their Spark 40 Amp.

@@ -20,7 +20,7 @@ Initial hardware build included:
  
 presets[]
  0,1,2,3 : slots 0x000-0x0003 hardware presets, associated with the amp's buttons
- 4 : slot 0x007f used by the app (and this program) to hold current preset
+ 4 : slot 0x007f used by the app (and this program) to hold temporary preset
  5 : slot 0x01XX (current state) - current preset + all the unsaved editing on the amp
 */
 #ifdef SSD1306WIRE //these global def's are in platformio.ini

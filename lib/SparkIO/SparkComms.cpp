@@ -12,14 +12,13 @@ SparkComms::~SparkComms() {
 }
 
 void SparkComms::start_ser() {
-  uint8_t b;
+  //uint8_t b;
   
   ser = new HardwareSerial(2); 
   // 5 is rx, 18 is tx
   ser->begin(HW_BAUD, SERIAL_8N1, 5, 18);
 
-  while (ser->available())
-    b = ser->read(); 
+  while (ser->available())    ser->read();
 }
 
 void btEventCallback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param){
@@ -45,13 +44,13 @@ void SparkComms::start_bt() {
 
 
 bool SparkComms::connect_to_spark() { //changed to boolean to be able to do it in a fancy way =)
-  volatile uint8_t b;
+  //uint8_t b;
   _btConnected = bt->connect(SPARK_NAME);
   if (!(_btConnected && bt->hasClient() )) {
     _btConnected = false;
   }
   // flush anything read from Spark - just in case
-  while (bt->available())     b = bt->read(); 
+  while (bt->available())   bt->read(); 
 
   return _btConnected;
 }

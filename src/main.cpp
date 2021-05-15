@@ -45,8 +45,8 @@ presets[]
 // GENERAL AND GLOBALS ======================================================================= 
 #define DISPLAY_SCL 22
 #define DISPLAY_SDA 21
-#define ENCODER1_CLK 5
-#define ENCODER1_DT 18
+#define ENCODER1_CLK 5 // note that GPIO5 is HardwareSerial(2) RX, don't use them together
+#define ENCODER1_DT 18 // note that GPIO18 is HardwareSerial(2) TX, don't use them together
 #define ENCODER1_SW 19
 #define ENCODER2_CLK 4
 #define ENCODER2_DT 16

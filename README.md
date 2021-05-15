@@ -26,6 +26,7 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 *   Storing presets in ESP's filesystem
 *   Accessing presets thru web-based UI via WiFi
 *   (?) "Scenes" mode. Remember the setups within one Tone and map them to the buttons. Switching between such scenes should be (or not: subject to test) fast enough to perform live.
+*   There's a raw idea of auto-normalizing presets' master volumes.
 
 ## Hardware
 

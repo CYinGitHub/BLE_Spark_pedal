@@ -16,17 +16,19 @@ It now can handle some basic functions:
 *   Long pressing the fourth button invokes not-implemented-yet mode ) 
 but it's buggy and cut yet.
 
+*   Long pressing the second button: bypassing all the 7 effects and then return to the previous state on any button press
+
 It's gonna be a standalone bluetooth footswitch for Spark amp to use in "gig mode", ie to switch between tones (4 stored within the amp, and a reasonable number, say 20, 50 or 100 of presets stored in on-board flash), or just turn On/Off effects inside a tone with just one tap.
 
 These presets will probably be accessible via the on-board web server thru WiFi connection (AP/Infrastructure mode). Or in some other way.
 
-## ToDo
+## TODO
 
-*   Total bypass: switching all the effects OFF and then return to the previous state
 *   Storing presets in ESP's filesystem
 *   Accessing presets thru web-based UI via WiFi
 *   (?) "Scenes" mode. Remember the setups within one Tone and map them to the buttons. Switching between such scenes should be (or not: subject to test) fast enough to perform live.
 *   There's a raw idea of auto-normalizing presets' master volumes.
+*   
 
 ## Hardware
 

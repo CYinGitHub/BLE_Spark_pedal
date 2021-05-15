@@ -88,6 +88,8 @@ volatile ulong safeRecursion=0;
 int pendingPresetNum = -1 ;
 int localPresetNum; 
 uint8_t remotePresetNum;
+bool fxState[] = {false,false,false,false,false,false,false}; // array to store FX's on/off state before total bypass is ON
+bool bypass=false;
 
 // Forward declarations ======================================================================
 void tempFrame(e_mode tempFrame, e_mode returnFrame, const ulong msTimeout) ;
@@ -105,6 +107,7 @@ void setPendingPreset(int localNum);
 void updateStatuses();
 void uploadPreset(int localNum);
 s_fx_coords fxNumByName(const char* fxName);
+void toggleBypass();
 
 // SPARKIE ================================================================================== 
 SparkIO spark_io(false); // do NOT do passthru as only one device here, no serial to the app
@@ -181,50 +184,56 @@ void frameBtConnect(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, 
 }
 
 void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-  display->setFont(SMALL_FONT);
-  display->setTextAlignment(TEXT_ALIGN_CENTER);
-  int pxPerLabel = (display->width() - 8) / PEDALS_NUM;
-  int boxWidth = display->getStringWidth("WWW");
-  boxWidth = max(boxWidth,pxPerLabel-2);
-  for (int i=0 ; i<PEDALS_NUM; i++) {
-    if (BUTTONS[i].fxState) {
-      display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
-    }
-    display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].fxLabel));
-  }
-  if (localPresetNum<=HW_PRESET_3) {
-    display->drawRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
-    display->drawString(boxWidth/2 + x,y + 16 ,"HW");
-  }
-  if (pendingPresetNum < 0) {
-    display->setTextAlignment(TEXT_ALIGN_LEFT);
-    display->setFont(HUGE_FONT);
-    int s1w = display->getStringWidth(String(localPresetNum + 1))+5;
+  if(bypass){
     display->setFont(BIG_FONT);
-    int s2w = display->getStringWidth(presets[CUR_EDITING].Name)+5;
-    if (s1w+s2w <= display->width()) {
-      scroller = ( display->width() - s1w - s2w ) / 2;
-    } else {
-      if ( millis() > scrollCounter ) {
-        scroller = scroller + scrollStep;
-        if (scroller < (int)(display->width())-s1w-s2w-s1w-s2w) {
-          scroller = scroller + s1w + s2w;
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    display->drawString(display->width()/2 + x, 20 + y, "BYPASS" );
+  } else {
+    display->setFont(SMALL_FONT);
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    int pxPerLabel = (display->width() - 8) / PEDALS_NUM;
+    int boxWidth = display->getStringWidth("WWW");
+    boxWidth = max(boxWidth,pxPerLabel-2);
+    for (int i=0 ; i<PEDALS_NUM; i++) {
+      if (BUTTONS[i].fxState) {
+        display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
+      }
+      display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].fxLabel));
+    }
+    if (localPresetNum<=HW_PRESET_3) {
+      display->drawRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
+      display->drawString(boxWidth/2 + x,y + 16 ,"HW");
+    }
+    if (pendingPresetNum < 0) {
+      display->setTextAlignment(TEXT_ALIGN_LEFT);
+      display->setFont(HUGE_FONT);
+      int s1w = display->getStringWidth(String(localPresetNum + 1))+5;
+      display->setFont(BIG_FONT);
+      int s2w = display->getStringWidth(presets[CUR_EDITING].Name)+5;
+      if (s1w+s2w <= display->width()) {
+        scroller = ( display->width() - s1w - s2w ) / 2;
+      } else {
+        if ( millis() > scrollCounter ) {
+          scroller = scroller + scrollStep;
+          if (scroller < (int)(display->width())-s1w-s2w-s1w-s2w) {
+            scroller = scroller + s1w + s2w;
+          }
+          scrollCounter = millis() + 20;
         }
-        scrollCounter = millis() + 20;
+        display->setFont(HUGE_FONT);
+        display->drawString( x + scroller + s1w + s2w, 11 + y, String(localPresetNum + 1) ); // +1 for humans
+        display->setFont(BIG_FONT);
+        display->drawString(x + scroller + s1w + s2w + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
       }
       display->setFont(HUGE_FONT);
-      display->drawString( x + scroller + s1w + s2w, 11 + y, String(localPresetNum + 1) ); // +1 for humans
+      display->drawString( x + scroller, 11 + y, String(localPresetNum + 1) ); // +1 for humans
       display->setFont(BIG_FONT);
-      display->drawString(x + scroller + s1w + s2w + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
+      display->drawString(x + scroller + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
+    } else {
+      display->setFont(HUGE_FONT);
+      display->setTextAlignment(TEXT_ALIGN_CENTER);
+      display->drawString(64 + x, 11 + y, String(localPresetNum+1) );
     }
-    display->setFont(HUGE_FONT);
-    display->drawString( x + scroller, 11 + y, String(localPresetNum + 1) ); // +1 for humans
-    display->setFont(BIG_FONT);
-    display->drawString(x + scroller + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
-  } else {
-    display->setFont(HUGE_FONT);
-    display->setTextAlignment(TEXT_ALIGN_CENTER);
-    display->drawString(64 + x, 11 + y, String(localPresetNum+1) );
   }
 }
 
@@ -546,6 +555,22 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
   if (mode==MODE_EFFECTS) {
     switch (eventType) {
       case ace_button::AceButton::kEventPressed:
+        if (bypass) {
+          toggleBypass();
+        } else {
+          if (id<PEDALS_NUM) {
+            //OnOff
+            spark_io.turn_effect_onoff(presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].EffectName, !presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff);
+            presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff = !presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff;
+            DEBUG(String(presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].EffectName));
+            updateStatuses();
+          }
+          if (id==4) {
+            tempFrame(MODE_LEVEL,mode,FRAME_TIMEOUT);
+          }
+        }
+        break;
+      case ace_button::AceButton::kEventLongPressed:
         if (id<PEDALS_NUM) {
           //OnOff
           spark_io.turn_effect_onoff(presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].EffectName, !presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff);
@@ -553,17 +578,15 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
           DEBUG(String(presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].EffectName));
           updateStatuses();
         }
-        if (id==4) {
-          tempFrame(MODE_LEVEL,mode,FRAME_TIMEOUT);
+        if (id==0) {
+           tempFrame(MODE_ABOUT,mode,4000);
         }
-        break;
-      case ace_button::AceButton::kEventLongPressed:
+        if (id == 1) {
+          toggleBypass();
+        }
         if (id==3) {
           mode = MODE_PRESETS;
           ui.transitionToFrame(mode);
-        }
-        if (id==0) {
-           tempFrame(MODE_ABOUT,mode,4000);
         }
         break;
       case ace_button::AceButton::kEventClicked:
@@ -830,4 +853,19 @@ void uploadPreset(int presetNum) {
   }
   updateStatuses();
   pendingPresetNum = -1;
+}
+
+void toggleBypass() {
+  if (bypass) {
+    for (int i=0; i<=6; i++){
+      presets[CUR_EDITING].effects[i].OnOff = fxState[i];
+      spark_io.turn_effect_onoff(presets[CUR_EDITING].effects[i].EffectName ,fxState[i]);
+    }
+  } else {    
+    for (int i=0; i<=6; i++){
+      fxState[i] = presets[CUR_EDITING].effects[i].OnOff;
+      spark_io.turn_effect_onoff(presets[CUR_EDITING].effects[i].EffectName ,false);
+    }
+  }
+  bypass = !bypass;
 }

@@ -11,10 +11,13 @@ It now can handle some basic functions:
     *   The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
     *   Long pressing the first button invokes amp info screen
     *   Long pressing the second button: bypassing all the 7 effects, and then any button returns to the previous state
+
 *   "PRESETS" mode: switching betwee
     *   Not implemented (it's simple but I personally don't need it)
+
 *   "ORGANIZE" mode: saving, loading presets, or whatever one may need to do with presets...
     *   Not implemented
+
 *   "SETTINGS" mode: some parameters stored in flash
     *   Not implemented   
 

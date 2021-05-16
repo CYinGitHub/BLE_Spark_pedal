@@ -568,6 +568,10 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
           if (id==4) {
             tempFrame(MODE_LEVEL,mode,FRAME_TIMEOUT);
           }
+          if (id==5) {
+            mode = MODE_PRESETS;
+            ui.transitionToFrame(mode);
+          }
         }
         break;
       case ace_button::AceButton::kEventLongPressed:
@@ -584,10 +588,6 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
         if (id == 1) {
           toggleBypass();
         }
-        if (id==3) {
-          mode = MODE_PRESETS;
-          ui.transitionToFrame(mode);
-        }
         break;
       case ace_button::AceButton::kEventClicked:
         break;
@@ -598,12 +598,12 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
   if (mode==MODE_PRESETS){
     switch (eventType) {
       case ace_button::AceButton::kEventPressed:
-        break;
-      case ace_button::AceButton::kEventLongPressed:
-        if (id==3) {
+        if (id==5) {
           mode = MODE_EFFECTS;
           ui.transitionToFrame(mode);
         }
+        break;
+      case ace_button::AceButton::kEventLongPressed:
         break;
       case ace_button::AceButton::kEventClicked:
         break;

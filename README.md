@@ -5,18 +5,18 @@
 
 It now can handle some basic functions:
 
-*   One rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX
+*   "Effects" mode
+*   The first rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX
 
-*   Another encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet
+*   The second encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet. Pushing it envokes
+
+*   Pressing the second encoder's button invokes not-implemented-yet PRESET mode )
 
 *   The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
 
 *   Long pressing the first button invokes amp info screen
 
-*   Long pressing the fourth button invokes not-implemented-yet mode ) 
-but it's buggy and cut yet.
-
-*   Long pressing the second button: bypassing all the 7 effects and then return to the previous state on any button press
+*   Long pressing the second button: bypassing all the 7 effects, and then any button returns to the previous state
 
 It's gonna be a standalone bluetooth footswitch for Spark amp to use in "gig mode", ie to switch between tones (4 stored within the amp, and a reasonable number, say 20, 50 or 100 of presets stored in on-board flash), or just turn On/Off effects inside a tone with just one tap.
 
@@ -26,9 +26,9 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 
 *   Storing presets in ESP's filesystem
 *   Accessing presets thru web-based UI via WiFi
-*   (?) "Scenes" mode. Remember the setups within one Tone and map them to the buttons. Switching between such scenes should be (or not: subject to test) fast enough to perform live.
 *   There's a raw idea of auto-normalizing presets' master volumes.
 *   Attaching addressable RGB LEDs
+*   (?) "Scenes" mode. Remember the setups within one Tone and map them to the buttons. Switching between such scenes should be (or not: subject to test) fast enough to perform live.
 
 ## Hardware
 

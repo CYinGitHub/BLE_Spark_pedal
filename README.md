@@ -5,18 +5,18 @@
 
 It now can handle some basic functions:
 
-*   "Effects" mode
-*   The first rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX
-
-*   The second encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet. Pushing it envokes
-
-*   Pressing the second encoder's button invokes not-implemented-yet PRESET mode )
-
-*   The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
-
-*   Long pressing the first button invokes amp info screen
-
-*   Long pressing the second button: bypassing all the 7 effects, and then any button returns to the previous state
+*   "EFFECTS" mode: on-off individual effecs in a chain
+    *   The first rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX
+    *   The second encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet. Pushing it envokes not-implemented-yet PRESETS mode )
+    *   The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
+    *   Long pressing the first button invokes amp info screen
+    *   Long pressing the second button: bypassing all the 7 effects, and then any button returns to the previous state
+*   "PRESETS" mode: switching betwee
+    *   Not implemented (it's simple but I personally don't need it)
+*   "ORGANIZE" mode: saving, loading presets, or whatever one may need to do with presets...
+    *   Not implemented
+*   "SETTINGS" mode: some parameters stored in flash
+    *   Not implemented   
 
 It's gonna be a standalone bluetooth footswitch for Spark amp to use in "gig mode", ie to switch between tones (4 stored within the amp, and a reasonable number, say 20, 50 or 100 of presets stored in on-board flash), or just turn On/Off effects inside a tone with just one tap.
 
@@ -25,7 +25,11 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 ## TODO
 
 *   Storing presets in ESP's filesystem
+*   Implement "PRESETS" mode
+*   Implement "ORGANIZE" mode
+*   Implement "SETTINGS" mode
 *   Accessing presets thru web-based UI via WiFi
+*   Storing master volume for every preset slot in flash
 *   There's a raw idea of auto-normalizing presets' master volumes.
 *   Attaching addressable RGB LEDs
 *   (?) "Scenes" mode. Remember the setups within one Tone and map them to the buttons. Switching between such scenes should be (or not: subject to test) fast enough to perform live.

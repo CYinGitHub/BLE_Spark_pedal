@@ -64,7 +64,8 @@ presets[]
 
 // a lot of globals, I know it's not that much elegant 
 enum e_amp_presets {HW_PRESET_0,HW_PRESET_1,HW_PRESET_2,HW_PRESET_3,TMP_PRESET,CUR_EDITING, TMP_PRESET_ADDR=0x007f};
-enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ABOUT, MODE_LEVEL}; // these numbers correspond to frame numbers of the UI
+// these numbers correspond to frame numbers of the UI (frames[])
+enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ORGANIZE, MODE_SETTINGS, MODE_ABOUT, MODE_LEVEL}; 
 e_mode mode = MODE_CONNECT;
 e_mode returnFrame = MODE_EFFECTS;  // we should memorize where to return
 const char* DEVICE_NAME = "Pedal for Spark";
@@ -108,6 +109,8 @@ void updateStatuses();
 void uploadPreset(int localNum);
 s_fx_coords fxNumByName(const char* fxName);
 void toggleBypass();
+void toggleEffect(int slotNum);
+void cycleMode();
 
 // SPARKIE ================================================================================== 
 SparkIO spark_io(false); // do NOT do passthru as only one device here, no serial to the app
@@ -122,8 +125,6 @@ ulong last_millis;
 int my_state;
 int scr_line;
 char str[50];
-
-
 
 // BUTTONS Init ==============================================================================
 typedef struct {
@@ -191,8 +192,8 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
   } else {
     display->setFont(SMALL_FONT);
     display->setTextAlignment(TEXT_ALIGN_CENTER);
-    int pxPerLabel = (display->width() - 8) / PEDALS_NUM;
     int boxWidth = display->getStringWidth("WWW");
+    int pxPerLabel = (display->width() - 8) / PEDALS_NUM;
     boxWidth = max(boxWidth,pxPerLabel-2);
     for (int i=0 ; i<PEDALS_NUM; i++) {
       if (BUTTONS[i].fxState) {
@@ -232,7 +233,7 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
     } else {
       display->setFont(HUGE_FONT);
       display->setTextAlignment(TEXT_ALIGN_CENTER);
-      display->drawString(64 + x, 11 + y, String(localPresetNum+1) );
+      display->drawString((display->width())/2 + x, 11 + y, String(localPresetNum+1) );
     }
   }
 }
@@ -248,8 +249,24 @@ void framePresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
   }
   display->setFont(HUGE_FONT);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString(64 + x, 11 + y, String(localPresetNum+1) );
+  display->drawString((display->width())/2 + x, 11 + y, String(localPresetNum+1) );
 }
+
+
+void frameOrganize(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+  //
+  display->setFont(HUGE_FONT);
+  display->setTextAlignment(TEXT_ALIGN_CENTER);
+  display->drawString((display->width())/2 + x, 11 + y, "ORG" );
+}
+
+void frameSettings(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+  //
+  display->setFont(HUGE_FONT);
+  display->setTextAlignment(TEXT_ALIGN_CENTER);
+  display->drawString((display->width())/2 + x, 11 + y, "SET" );
+}
+
 
 void frameAbout(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   if (ampName=="") { // welcome 
@@ -277,11 +294,11 @@ void frameLevel(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
   if(display->getStringWidth(str)>display->width()) {
     display->setFont(BIG_FONT);
   }
-  display->drawString(64 + x, 11 + y , String(str) );
+  display->drawString((display->width())/2 + x, 11 + y , String(str) );
 } 
 
 // array of frame drawing functions
-FrameCallback frames[] = { frameBtConnect, frameEffects, framePresets, frameAbout, frameLevel };
+FrameCallback frames[] = { frameBtConnect, frameEffects, framePresets, frameOrganize, frameSettings, frameAbout, frameLevel };
 
 // number of frames in UI
 int frameCount = 5;
@@ -543,13 +560,17 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
     if (id==4 && eventType==ace_button::AceButton::kEventPressed) {
       curKnob++;
       if (curKnob>=knobs_number) curKnob=0;
-      
       curFx = knobs_order[curKnob].fxSlot;
       curParam = knobs_order[curKnob].fxNumber;
       fxCaption = spark_knobs[curFx][curParam];
       level = presets[CUR_EDITING].effects[curFx].Parameters[curParam] * 100;
       timeToGoBack = millis() + FRAME_TIMEOUT;
       DEBUG(curKnob);
+    }
+  }
+  if (eventType == ace_button::AceButton::kEventPressed) {
+    if (id==5) {
+      cycleMode();
     }
   }
   if (mode==MODE_EFFECTS) {
@@ -559,28 +580,16 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
           toggleBypass();
         } else {
           if (id<PEDALS_NUM) {
-            //OnOff
-            spark_io.turn_effect_onoff(presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].EffectName, !presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff);
-            presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff = !presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff;
-            DEBUG(String(presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].EffectName));
-            updateStatuses();
+            toggleEffect(BUTTONS[id].fxSlotNumber);
           }
           if (id==4) {
             tempFrame(MODE_LEVEL,mode,FRAME_TIMEOUT);
-          }
-          if (id==5) {
-            mode = MODE_PRESETS;
-            ui.transitionToFrame(mode);
           }
         }
         break;
       case ace_button::AceButton::kEventLongPressed:
         if (id<PEDALS_NUM) {
-          //OnOff
-          spark_io.turn_effect_onoff(presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].EffectName, !presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff);
-          presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff = !presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].OnOff;
-          DEBUG(String(presets[CUR_EDITING].effects[BUTTONS[id].fxSlotNumber].EffectName));
-          updateStatuses();
+          toggleEffect(BUTTONS[id].fxSlotNumber);
         }
         if (id==0) {
            tempFrame(MODE_ABOUT,mode,4000);
@@ -598,10 +607,6 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
   if (mode==MODE_PRESETS){
     switch (eventType) {
       case ace_button::AceButton::kEventPressed:
-        if (id==5) {
-          mode = MODE_EFFECTS;
-          ui.transitionToFrame(mode);
-        }
         break;
       case ace_button::AceButton::kEventLongPressed:
         break;
@@ -868,4 +873,39 @@ void toggleBypass() {
     }
   }
   bypass = !bypass;
+}
+
+void toggleEffect(int slotNum) {
+  spark_io.turn_effect_onoff(presets[CUR_EDITING].effects[slotNum].EffectName, !presets[CUR_EDITING].effects[slotNum].OnOff);
+  presets[CUR_EDITING].effects[slotNum].OnOff = !presets[CUR_EDITING].effects[slotNum].OnOff;
+  DEBUG(String(presets[CUR_EDITING].effects[slotNum].EffectName));
+  updateStatuses();
+}
+
+void cycleMode(){
+  switch (mode)
+  {
+  case MODE_LEVEL:
+  case MODE_ABOUT:
+  case MODE_EFFECTS:
+    mode=MODE_PRESETS;
+    break;
+  case MODE_PRESETS:
+    mode=MODE_ORGANIZE;
+    ui.switchToFrame(mode);
+    break;
+  case MODE_ORGANIZE:
+    mode=MODE_SETTINGS;
+    ui.switchToFrame(mode);
+    break;
+  case MODE_SETTINGS:
+    mode=MODE_EFFECTS;
+    ui.switchToFrame(mode);
+    break;
+  default:
+    mode=MODE_EFFECTS;
+    break;
+  }
+  ui.switchToFrame(mode);
+  ui.update();
 }

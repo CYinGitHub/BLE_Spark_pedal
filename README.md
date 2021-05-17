@@ -10,9 +10,9 @@ It now can handle some basic functions:
     *   The second encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet. Pushing it envokes not-implemented-yet PRESETS mode )
     *   The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
     *   Long pressing the first button invokes amp info screen
-    *   Long pressing the second button: bypassing all the 7 effects, and then any button returns to the previous state
+    *   Long pressing the second button: bypassing all the 7 effects, and then any button returns the amp to the previous state
 
-*   "PRESETS" mode: switching betwee
+*   "PRESETS" mode: switching between four hardware presets
     *   Not implemented (it's simple but I personally don't need it)
 
 *   "ORGANIZE" mode: saving, loading presets, or whatever one may need to do with presets...

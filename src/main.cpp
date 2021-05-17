@@ -111,6 +111,7 @@ s_fx_coords fxNumByName(const char* fxName);
 void toggleBypass();
 void toggleEffect(int slotNum);
 void cycleMode();
+void ESP_off();
 
 // SPARKIE ================================================================================== 
 SparkIO spark_io(false); // do NOT do passthru as only one device here, no serial to the app
@@ -164,7 +165,7 @@ MD_REncoder Encoder2 = MD_REncoder(ENCODER2_DT, ENCODER2_CLK);
 #ifdef SSD1306WIRE
   SSD1306Wire  display(0x3c, DISPLAY_SDA , DISPLAY_SCL); //in my case GPIO's are SDA=21 , SCL=22 , addr is 0x3c 
 #endif
-#ifdef SF1106WIRE
+#ifdef SH1106WIRE
   SH1106Wire display(0x3c, DISPLAY_SDA, DISPLAY_SCL);
 #endif
 OLEDDisplayUi ui( &display );
@@ -301,7 +302,7 @@ void frameLevel(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
 FrameCallback frames[] = { frameBtConnect, frameEffects, framePresets, frameOrganize, frameSettings, frameAbout, frameLevel };
 
 // number of frames in UI
-int frameCount = 5;
+int frameCount = 7;
 
 // Overlays are statically drawn on top of a frame eg. a clock
 OverlayCallback overlays[] = { screenOverlay };
@@ -571,6 +572,12 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
   if (eventType == ace_button::AceButton::kEventPressed) {
     if (id==5) {
       cycleMode();
+    }
+  }
+  
+  if (eventType == ace_button::AceButton::kEventLongPressed) {
+    if (id==5) {
+      ESP_off();
     }
   }
   if (mode==MODE_EFFECTS) {
@@ -892,20 +899,31 @@ void cycleMode(){
     break;
   case MODE_PRESETS:
     mode=MODE_ORGANIZE;
-    ui.switchToFrame(mode);
     break;
   case MODE_ORGANIZE:
     mode=MODE_SETTINGS;
-    ui.switchToFrame(mode);
     break;
   case MODE_SETTINGS:
     mode=MODE_EFFECTS;
-    ui.switchToFrame(mode);
     break;
   default:
     mode=MODE_EFFECTS;
     break;
   }
-  ui.switchToFrame(mode);
+  ui.transitionToFrame(mode);
   ui.update();
 }
+void f() { 
+  esp_sleep_pd_domain_t();
+}
+
+
+void ESP_off(){
+  display.clear();
+  display.display();
+  DEBUG("deep sleep");
+  delay(1000);
+ // esp_sleep_enable_ext1_wakeup(GPIO_NUM_0, ESP_EXT1_WAKEUP_ALL_LOW);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_0,0);
+  esp_deep_sleep_start() ;
+};

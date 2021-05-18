@@ -13,7 +13,7 @@ It now can handle some basic functions:
     *   Long pressing the second button: bypassing all the 7 effects, and then any button returns the amp to the previous state
 
 *   "PRESETS" mode: switching between four hardware presets
-    *   Not implemented (it's simple but I personally don't need it)
+    *   Not implemented
 
 *   "ORGANIZE" mode: saving, loading presets, or whatever one may need to do with presets...
     *   Not implemented

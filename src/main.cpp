@@ -569,7 +569,7 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
       DEBUG(curKnob);
     }
   }
-  if (eventType == ace_button::AceButton::kEventPressed) {
+  if (eventType == ace_button::AceButton::kEventClicked) {
     if (id==5) {
       cycleMode();
     }

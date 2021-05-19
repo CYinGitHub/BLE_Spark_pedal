@@ -24,9 +24,6 @@ void SparkComms::start_ser() {
 void btEventCallback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param){
   // On BT connection close
   if (event == ESP_SPP_CLOSE_EVT ){
-    // TODO: Until the cause of connection instability (compared to Pi version) over long durations 
-    // is resolved, this should keep your pedal and amp connected fairly well by forcing reconnection
-    // in the main loop
     SparkComms::_btConnected = false;
   }
 
@@ -34,8 +31,7 @@ void btEventCallback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param){
 
 void SparkComms::start_bt() {
   bt = new BluetoothSerial();
-  
-   bt->register_callback(btEventCallback);
+  bt->register_callback(btEventCallback);
   if (!bt->begin (MY_NAME, true)) {
     DEBUG("Bluetooth init fail");
     while (true);
@@ -51,6 +47,5 @@ bool SparkComms::connect_to_spark() { //changed to boolean to be able to do it i
   }
   // flush anything read from Spark - just in case
   while (bt->available())   bt->read(); 
-
   return _btConnected;
 }

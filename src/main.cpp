@@ -9,6 +9,9 @@
 #include "SparkComms.h"
 #include "SparkPresets.h" // maybe it's not the right place, but....
 
+#define ARDUINOJSON_USE_DOUBLE 1
+#include "ArduinoJson.h"
+
 /*  
       Some explanations
 This project is located here: https://github.com/copych/BT_Spark_pedal
@@ -23,7 +26,7 @@ presets[]
  4 : slot 0x007f used by the app (and this program) to hold temporary preset
  5 : slot 0x01XX (current state) - current preset + all the unsaved editing on the amp
 */
-#ifdef SSD1306WIRE //these global def's are in platformio.ini
+#ifdef SSD1306WIRE //which of the OLED displays you use: these global def's are in platformio.ini
   #include "SSD1306Wire.h"
 #endif
 #ifdef SH1106WIRE
@@ -48,13 +51,14 @@ presets[]
 #define ENCODER1_CLK 5 // note that GPIO5 is HardwareSerial(2) RX, don't use them together
 #define ENCODER1_DT 18 // note that GPIO18 is HardwareSerial(2) TX, don't use them together
 #define ENCODER1_SW 19
-#define ENCODER2_CLK 4
+#define ENCODER2_CLK 17
 #define ENCODER2_DT 16
-#define ENCODER2_SW 17
+#define ENCODER2_SW 4 // (on/off) Only GPIOs which have RTC functionality can be used: 0,2,4,12-15,25-27,32-39 
 #define BUTTON1_PIN 25
 #define BUTTON2_PIN 26
 #define BUTTON3_PIN 27
 #define BUTTON4_PIN 14
+#define BT_ATTEMPTS_BEFORE_OFF 3
 #define TRANSITION_TIME 200 //(ms) ui slide effect timing
 #define FRAME_TIMEOUT 3000 //(ms) to return to main UI from temporary UI frame 
 #define SMALL_FONT ArialMT_Plain_10
@@ -91,6 +95,7 @@ int localPresetNum;
 uint8_t remotePresetNum;
 bool fxState[] = {false,false,false,false,false,false,false}; // array to store FX's on/off state before total bypass is ON
 bool bypass=false;
+int btAttempts;
 
 // Forward declarations ======================================================================
 void tempFrame(e_mode tempFrame, e_mode returnFrame, const ulong msTimeout) ;
@@ -111,6 +116,7 @@ s_fx_coords fxNumByName(const char* fxName);
 void toggleBypass();
 void toggleEffect(int slotNum);
 void cycleMode();
+bool createFolders();
 void ESP_off();
 
 // SPARKIE ================================================================================== 
@@ -149,8 +155,8 @@ s_buttons BUTTONS[BUTTONS_NUM] = {
   {BUTTON2_PIN, "MOD", "SAV", 0, 0, 4, false},
   {BUTTON3_PIN, "DLY", "PRV", 0, 0, 5, false},
   {BUTTON4_PIN, "RVB", "NXT", 0, 0, 6, false},
-  {ENCODER1_SW, "VOL", "MAS", 0, 0, 0, false}, //encoder 1 (may or may not be here)
-  {ENCODER2_SW, "PRS", "PRS", 0, 0, 0, false}, //encoder 2 (may or may not be here)
+  {ENCODER1_SW, "", "", 0, 0, 0, false}, //encoder 1 (may or may not be here)
+  {ENCODER2_SW, "", "", 0, 0, 0, false}, //encoder 2 (may or may not be here)
 };
 
 ace_button::AceButton buttons[BUTTONS_NUM];
@@ -320,6 +326,7 @@ void setup() {
   Serial.begin(115200);
   DEBUG(F("Serial started")); 
   localPresetNum = 1;
+  btAttempts = 0;
   ui.setTargetFPS(30);
   ui.disableAllIndicators();
   ui.setFrameAnimation(SLIDE_LEFT);
@@ -333,9 +340,6 @@ void setup() {
   display.setColor(INVERSE);
   ui.switchToFrame(MODE_ABOUT);// show welcome screen
   ui.update();
-  delay(1000);
-  spark_io.comms = &spark_comms;
-  spark_comms.start_bt();
 
   for (uint8_t i = 0; i < BUTTONS_NUM; i++) {
     pinMode(BUTTONS[i].pin, INPUT_PULLUP);
@@ -358,7 +362,15 @@ void setup() {
   buttonConfig->setFeature(ace_button::ButtonConfig::kFeatureSuppressAfterDoubleClick);
   buttonConfig->setFeature(ace_button::ButtonConfig::kFeatureSuppressAfterClick);
 
-  // btInit();
+  // Check FS
+  LITTLEFS.begin();
+  if(!LITTLEFS.exists("/" + (String)(TOTAL_PRESETS-1))) {
+    createFolders();
+  }
+  delay(1000);
+  spark_io.comms = &spark_comms;
+  spark_comms.start_bt();
+
   DEBUG("Setup(): done");
 }
 
@@ -631,18 +643,18 @@ void btConnect() {
   while (!btConnected) {
     ui.switchToFrame(MODE_CONNECT);
     btCaption = "CONNECTING..";
-    ui.update();
-    delay(50); //let cores breathe as ESP's delay() has air in it
-    ui.update(); // kinda workaround forcing to this frame
+    btAttempts++;
+    if (btAttempts>BT_ATTEMPTS_BEFORE_OFF) ESP_off();
+    delay(50); 
+    ui.update(); 
     DEBUG("Connecting... >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-    btConnected =  spark_comms.connect_to_spark();
-    // If BT connection with amp is successful
+    btConnected = spark_comms.connect_to_spark();
     if (btConnected && spark_comms.bt->hasClient()) {
       DEBUG("BT Connected");      
       btCaption = "RETRIEVING..";
       greetings();
       mode = MODE_EFFECTS;
-      tempFrame(MODE_ABOUT,mode,3000);
+      tempFrame(MODE_ABOUT, mode, 3000);
     } else {
       ui.switchToFrame(MODE_CONNECT);
       ui.update();
@@ -651,7 +663,7 @@ void btConnect() {
       serialNum = "";
       firmwareVer = "";
       ampName = "";
-      DEBUG("BT NOT Connected");
+      DEBUG("BT NOT Connected: " + btAttempts);
     }
   }
 }
@@ -913,17 +925,91 @@ void cycleMode(){
   ui.transitionToFrame(mode);
   ui.update();
 }
-void f() { 
-  esp_sleep_pd_domain_t();
+
+bool createFolders() {
+  bool noErr = true;
+  for (int i=HW_PRESET_3+1; i<TOTAL_PRESETS;i++) {
+    if (!LITTLEFS.exists("/"+(String)i)) {
+      noErr = noErr && LITTLEFS.mkdir("/"+(String)i);
+    }
+  }
+  return noErr;
 }
 
+SparkPreset loadPresetFromFile(int presetSlot) {
+  SparkPreset ret_preset;
+  String fileName =  "/"+(String)(presetSlot) + "/" + "preset.json";
+  if (!LITTLEFS.exists(fileName)) {
+    ret_preset = *my_presets[0];
+      strcpy(ret_preset.Name, "Empty Slot");
+    return ret_preset;
+  } else {
+    File presetFile = LITTLEFS.open(fileName);
+    DynamicJsonDocument doc(3072);
+    DeserializationError error = deserializeJson(doc, presetFile);
+    if (error) {
+      DEBUG("deserializeJson() failed: " + error.f_str());
+      ret_preset = *my_presets[0];
+      strcpy(ret_preset.Name, "Error");
+      return ret_preset;
+    } else {
+      if (doc["type"] == "jamup_speaker") { // official app's json
+        ret_preset.BPM = doc["bpm"];
+        JsonObject meta = doc["meta"];
+        strcpy(ret_preset.Name, meta["name"]);
+        strcpy(ret_preset.Description, meta["description"]);
+        strcpy(ret_preset.Version, meta["version"]);
+        strcpy(ret_preset.Icon, meta["icon"]);
+        strcpy(ret_preset.UUID, meta["id"]);
+      }
+      JsonArray sigpath = doc["sigpath"];
+      for (int i =0; i<=6; i++) { // effects
+        int num_params = 0;
+        JsonObject fx = sigpath[i];
+        for (JsonObject elem : fx["params"].as<JsonArray>()) {
+          double value = elem["value"]; 
+          int index = elem["index"];
+          ret_preset.effects[i].Parameters[index] = value;
+          num_params = max(num_params,index);
+        }
+        ret_preset.effects[i].NumParameters = num_params;
+        strcpy(ret_preset.effects[i].EffectName , fx["dspId"]);
+        ret_preset.effects[i].OnOff = (strcmp(fx["active"], "true")==0);
+      }
+    }
+  }
+  return preset0;
+}
+
+void textAnimation(const String &s, ulong msDelay) {  
+    display.clear();
+    display.drawString(display.width()/2,display.height()/2-6, s);
+    display.display();
+    delay(msDelay);
+}
 
 void ESP_off(){
+  // Only GPIOs which have RTC functionality can be used: 0,2,4,12-15,25-27,32-39
+  esp_sleep_enable_ext0_wakeup( static_cast <gpio_num_t> (ENCODER2_SW), LOW);
+  //esp_sleep_enable_ext1_wakeup( BUTTON1_PIN | BUTTON2_PIN | BUTTON3_PIN | BUTTON4_PIN | ENCODER1_SW | ENCODER2_SW , ESP_EXT1_WAKEUP_ANY_HIGH);
+ // esp_sleep_pd_config();
+  String s = "-----------------";
   display.clear();
   display.display();
+  display.setFont(MID_FONT);
+  display.setTextAlignment(TEXT_ALIGN_CENTER);
+  for (int i=0; i<8; i++) {
+    s = s.substring(i);
+    textAnimation(s,70);
+  }
+  for (int i=0; i<3; i++) {
+    textAnimation("\\",30);
+    textAnimation("|",30);
+    textAnimation("/",30);
+    textAnimation("--",30);
+  }
+  textAnimation("",10);
   DEBUG("deep sleep");
   delay(1000);
- // esp_sleep_enable_ext1_wakeup(GPIO_NUM_0, ESP_EXT1_WAKEUP_ALL_LOW);
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_0,0);
   esp_deep_sleep_start() ;
 };

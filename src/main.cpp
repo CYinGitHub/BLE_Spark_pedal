@@ -59,6 +59,10 @@ presets[]
 #define BUTTON3_PIN 27
 #define BUTTON4_PIN 14
 #define BT_ATTEMPTS_BEFORE_OFF 3
+#define HW_PRESETS 4  // 4 hardware presets in amp
+#define HARD_PRESETS 24  // number of hard-coded presets in SparkPresets.h
+#define FLASH_PRESETS 50  // number of presets stored in on-board flash
+#define TOTAL_PRESETS HW_PRESETS + FLASH_PRESETS 
 #define TRANSITION_TIME 200 //(ms) ui slide effect timing
 #define FRAME_TIMEOUT 3000 //(ms) to return to main UI from temporary UI frame 
 #define SMALL_FONT ArialMT_Plain_10
@@ -73,8 +77,7 @@ enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ORGANIZE, MODE_SETTI
 e_mode mode = MODE_CONNECT;
 e_mode returnFrame = MODE_EFFECTS;  // we should memorize where to return
 const char* DEVICE_NAME = "Pedal for Spark";
-const char* VERSION = "0.6a"; 
-const uint8_t TOTAL_PRESETS = 4 + 24 ; // 4hardware + number of stored on board presets
+const char* VERSION = "0.6a";
 const uint8_t MAX_LEVEL = 100; // maximum level of effect, actual value in UI is level divided by 100
 bool btConnected = false;
 int scroller=0, scrollStep = -2; // speed of scrolling tone names
@@ -96,6 +99,7 @@ uint8_t remotePresetNum;
 bool fxState[] = {false,false,false,false,false,false,false}; // array to store FX's on/off state before total bypass is ON
 bool bypass=false;
 int btAttempts;
+SparkPreset flashPresets[FLASH_PRESETS];
 
 // Forward declarations ======================================================================
 void tempFrame(e_mode tempFrame, e_mode returnFrame, const ulong msTimeout) ;
@@ -117,7 +121,10 @@ void toggleBypass();
 void toggleEffect(int slotNum);
 void cycleMode();
 bool createFolders();
+void textAnimation(const String &s, ulong msDelay);
 void ESP_off();
+void buildPresetList();
+void updatePresetList(uint8_t numPreset);
 
 // SPARKIE ================================================================================== 
 SparkIO spark_io(false); // do NOT do passthru as only one device here, no serial to the app
@@ -208,7 +215,7 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
       }
       display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].fxLabel));
     }
-    if (localPresetNum<=HW_PRESET_3) {
+    if (localPresetNum<HW_PRESETS) {
       display->drawRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
       display->drawString(boxWidth/2 + x,y + 16 ,"HW");
     }
@@ -367,7 +374,6 @@ void setup() {
   if(!LITTLEFS.exists("/" + (String)(TOTAL_PRESETS-1))) {
     createFolders();
   }
-  delay(1000);
   spark_io.comms = &spark_comms;
   spark_comms.start_bt();
 
@@ -385,6 +391,9 @@ if (safeRecursion>2) {
 btConnected = spark_comms.connected();
   if (!btConnected) {
     btConnect();
+    DEBUG(">>> start building catalog");
+    buildPresetList();
+    DEBUG(">>> finish building catalog");
   } else {
 // SSSSSSSSSSSSSSSSSS-PPPPPPPPPPPPPPPPP-AAAAAAAAAAAAAAAAA-RRRRRRRRRRRRRRRR-KKKKKKKKKKKKKKKKKKK 
     spark_io.process();
@@ -434,7 +443,7 @@ btConnected = spark_comms.connected();
       
       if (cmdsub == 0x0338) { // >0x0138 or amp button
         remotePresetNum = msg.param2;
-        if (remotePresetNum<=HW_PRESET_3){
+        if (remotePresetNum<HW_PRESETS){
           localPresetNum = remotePresetNum;
           presets[CUR_EDITING] = presets[remotePresetNum];
         }
@@ -462,7 +471,7 @@ btConnected = spark_comms.connected();
 
       if (cmdsub == 0x0327) {
         remotePresetNum = msg.param2;
-        if (remotePresetNum <= HW_PRESET_3) {
+        if (remotePresetNum < HW_PRESETS) {
           localPresetNum = remotePresetNum;
           spark_io.get_preset_details(remotePresetNum);
           waitForResponse(spark_io.expectedSubcmd,1000);
@@ -536,7 +545,7 @@ btConnected = spark_comms.connected();
         localPresetNum--;
         if (localPresetNum<0) localPresetNum=TOTAL_PRESETS-1;
       }
-      if (localPresetNum <= HW_PRESET_3 ) {
+      if (localPresetNum < HW_PRESETS ) {
         remotePresetNum = localPresetNum;
       } else {
         remotePresetNum = TMP_PRESET_ADDR;
@@ -690,7 +699,7 @@ void returnToMainUI() {
 
 void dump_preset(SparkPreset preset) {
   int i,j;
-  DEBUG(">================================");
+  DEBUG(">===========================================================");
   DEBUG(preset.curr_preset);
   DEBUG(preset.preset_num);
   DEBUG(preset.UUID);
@@ -856,7 +865,7 @@ void setPendingPreset(int presetNum) {
 
 void uploadPreset(int presetNum) {
   localPresetNum = presetNum;
-  if (presetNum <= HW_PRESET_3 ) {
+  if (presetNum < HW_PRESETS ) {
     spark_io.change_hardware_preset(presetNum);
     remotePresetNum = presetNum;
     presets[CUR_EDITING] = presets[presetNum];
@@ -864,7 +873,8 @@ void uploadPreset(int presetNum) {
     remotePresetNum = TMP_PRESET_ADDR;
     // upload presets from ESP32's filesystem to TMP_PRESET_ADDR slot
     // TODO read preset #localPresetNum from LITTLEFS
-    preset = *my_presets[presetNum-HW_PRESET_3-1];
+ //   preset = *my_presets[presetNum-HW_PRESETS];
+    preset = flashPresets[presetNum-HW_PRESETS];
     DEBUG(">>>>>uploading '" + preset.Name + "' to 0x007f");
     // change preset.number to 0x007f
     preset.preset_num = TMP_PRESET_ADDR;
@@ -928,7 +938,7 @@ void cycleMode(){
 
 bool createFolders() {
   bool noErr = true;
-  for (int i=HW_PRESET_3+1; i<TOTAL_PRESETS;i++) {
+  for (int i=HW_PRESETS; i<TOTAL_PRESETS;i++) {
     if (!LITTLEFS.exists("/"+(String)i)) {
       noErr = noErr && LITTLEFS.mkdir("/"+(String)i);
     }
@@ -936,49 +946,78 @@ bool createFolders() {
   return noErr;
 }
 
+SparkPreset somePreset(const char* substTitle) {
+  SparkPreset ret_preset = *my_presets[random(HARD_PRESETS-1)];
+  strcpy(ret_preset.Description, ret_preset.Name);
+  strcpy(ret_preset.Name, substTitle);
+  DEBUG("Subst Preset: " + substTitle);
+  return ret_preset;
+}
+
 SparkPreset loadPresetFromFile(int presetSlot) {
-  SparkPreset ret_preset;
-  String fileName =  "/"+(String)(presetSlot) + "/" + "preset.json";
-  if (!LITTLEFS.exists(fileName)) {
-    ret_preset = *my_presets[0];
-      strcpy(ret_preset.Name, "Empty Slot");
-    return ret_preset;
+  SparkPreset retPreset;
+  double value;
+  int numParams;
+  File presetFile;
+  // open dir bound to the slot number
+  String dirName =  "/" + (String)(presetSlot) ;
+  String fileName = "";
+  if (!LITTLEFS.exists(dirName)) {
+    return somePreset("(No Such Slot)");
   } else {
-    File presetFile = LITTLEFS.open(fileName);
+    File dir = LITTLEFS.open(dirName);
+    while (!fileName.endsWith(".json")) {
+      presetFile = dir.openNextFile();
+      if (!presetFile) {
+        return somePreset("(Empty Slot)");
+      }
+      fileName = presetFile.name();
+      DEBUG(">>>>>>>>>>>>>>>>>> '" + fileName + "'");
+    }
+    dir.close();
     DynamicJsonDocument doc(3072);
     DeserializationError error = deserializeJson(doc, presetFile);
     if (error) {
-      DEBUG("deserializeJson() failed: " + error.f_str());
-      ret_preset = *my_presets[0];
-      strcpy(ret_preset.Name, "Error");
-      return ret_preset;
+      return somePreset("(Invalid json file)");
     } else {
-      if (doc["type"] == "jamup_speaker") { // official app's json
-        ret_preset.BPM = doc["bpm"];
+      if (doc["type"] == "jamup_speaker") { // PG app's json
+        retPreset.BPM = doc["bpm"];
         JsonObject meta = doc["meta"];
-        strcpy(ret_preset.Name, meta["name"]);
-        strcpy(ret_preset.Description, meta["description"]);
-        strcpy(ret_preset.Version, meta["version"]);
-        strcpy(ret_preset.Icon, meta["icon"]);
-        strcpy(ret_preset.UUID, meta["id"]);
-      }
-      JsonArray sigpath = doc["sigpath"];
-      for (int i =0; i<=6; i++) { // effects
-        int num_params = 0;
-        JsonObject fx = sigpath[i];
-        for (JsonObject elem : fx["params"].as<JsonArray>()) {
-          double value = elem["value"]; 
-          int index = elem["index"];
-          ret_preset.effects[i].Parameters[index] = value;
-          num_params = max(num_params,index);
-        }
-        ret_preset.effects[i].NumParameters = num_params;
-        strcpy(ret_preset.effects[i].EffectName , fx["dspId"]);
-        ret_preset.effects[i].OnOff = (strcmp(fx["active"], "true")==0);
+        strcpy(retPreset.Name, meta["name"]);
+        strcpy(retPreset.Description, meta["description"]);
+        strcpy(retPreset.Version, meta["version"]);
+        strcpy(retPreset.Icon, meta["icon"]);
+        strcpy(retPreset.UUID, meta["id"]);
+        JsonArray sigpath = doc["sigpath"];
+        for (int i =0; i<=6; i++) { // effects
+          numParams = 0;
+          JsonObject fx = sigpath[i];
+          for (JsonObject elem : fx["params"].as<JsonArray>()) {
+            // clanky PG format sometimes uses double, and sometimes bool as char[]
+            if ( elem["value"].is<bool>() ) {
+              if (elem["value"]) {
+                value = 0.5;
+              } else {
+                value = 0;
+              }
+            } else { // let's hope they don't invent some other type
+              value = elem["value"]; 
+            }
+            int index = elem["index"];
+            retPreset.effects[i].Parameters[index] = value;
+            numParams = max(numParams,index);
+          }
+          retPreset.effects[i].NumParameters = numParams+1;
+          strcpy(retPreset.effects[i].EffectName , fx["dspId"]);
+          retPreset.effects[i].OnOff = fx["active"];
+          retPreset.preset_num = 0;
+          retPreset.curr_preset = 0;
+        }   
       }
     }
   }
-  return preset0;
+  presetFile.close();
+  return retPreset;
 }
 
 void textAnimation(const String &s, ulong msDelay) {  
@@ -989,10 +1028,7 @@ void textAnimation(const String &s, ulong msDelay) {
 }
 
 void ESP_off(){
-  // Only GPIOs which have RTC functionality can be used: 0,2,4,12-15,25-27,32-39
-  esp_sleep_enable_ext0_wakeup( static_cast <gpio_num_t> (ENCODER2_SW), LOW);
-  //esp_sleep_enable_ext1_wakeup( BUTTON1_PIN | BUTTON2_PIN | BUTTON3_PIN | BUTTON4_PIN | ENCODER1_SW | ENCODER2_SW , ESP_EXT1_WAKEUP_ANY_HIGH);
- // esp_sleep_pd_config();
+  //  CRT-off effect =) or something
   String s = "-----------------";
   display.clear();
   display.display();
@@ -1008,8 +1044,29 @@ void ESP_off(){
     textAnimation("/",30);
     textAnimation("--",30);
   }
-  textAnimation("",10);
+  textAnimation("...z-Z-Z",1000);
+  //fade out
+  for(int i = 100; i>10; i--) {
+    display.setContrast(i,2.65*i-24,0.64*i);
+    delay(10);
+  }
+  // hopefully displayOff() saves energy
+  display.displayOff();
   DEBUG("deep sleep");
-  delay(1000);
+  //  Only GPIOs which have RTC functionality can be used: 0,2,4,12-15,25-27,32-39
+  esp_sleep_enable_ext0_wakeup( static_cast <gpio_num_t> (ENCODER2_SW), LOW);
   esp_deep_sleep_start() ;
 };
+
+void updatePresetList(uint8_t numPreset) {
+    preset = loadPresetFromFile(numPreset);
+    flashPresets[numPreset-HW_PRESETS] = preset;
+}
+
+// catalogue presets stored on-board
+void buildPresetList() {
+  for (int i=HW_PRESETS; i<TOTAL_PRESETS; i++){
+    updatePresetList(i);
+    //dump_preset(preset);
+  }
+}

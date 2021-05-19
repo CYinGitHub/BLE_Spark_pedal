@@ -73,7 +73,7 @@ enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ORGANIZE, MODE_SETTI
 e_mode mode = MODE_CONNECT;
 e_mode returnFrame = MODE_EFFECTS;  // we should memorize where to return
 const char* DEVICE_NAME = "Pedal for Spark";
-const char* VERSION = "0.5a"; 
+const char* VERSION = "0.6a"; 
 const uint8_t TOTAL_PRESETS = 4 + 24 ; // 4hardware + number of stored on board presets
 const uint8_t MAX_LEVEL = 100; // maximum level of effect, actual value in UI is level divided by 100
 bool btConnected = false;

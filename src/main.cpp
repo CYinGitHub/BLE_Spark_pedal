@@ -62,7 +62,8 @@ presets[]
 #define HW_PRESETS 4  // 4 hardware presets in amp
 #define HARD_PRESETS 24  // number of hard-coded presets in SparkPresets.h
 #define FLASH_PRESETS 50  // number of presets stored in on-board flash
-#define TOTAL_PRESETS HW_PRESETS + FLASH_PRESETS 
+#define TOTAL_PRESETS HW_PRESETS + FLASH_PRESETS
+#define TOTAL_SCENES 50 // number of 4-efx combinations to store
 #define TRANSITION_TIME 200 //(ms) ui slide effect timing
 #define FRAME_TIMEOUT 3000 //(ms) to return to main UI from temporary UI frame 
 #define SMALL_FONT ArialMT_Plain_10
@@ -77,7 +78,7 @@ enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ORGANIZE, MODE_SETTI
 e_mode mode = MODE_CONNECT;
 e_mode returnFrame = MODE_EFFECTS;  // we should memorize where to return
 const char* DEVICE_NAME = "Pedal for Spark";
-const char* VERSION = "0.6a";
+const char* VERSION = "0.7a";
 const uint8_t MAX_LEVEL = 100; // maximum level of effect, actual value in UI is level divided by 100
 bool btConnected = false;
 int scroller=0, scrollStep = -2; // speed of scrolling tone names
@@ -100,6 +101,8 @@ bool fxState[] = {false,false,false,false,false,false,false}; // array to store 
 bool bypass=false;
 int btAttempts;
 SparkPreset flashPresets[FLASH_PRESETS];
+int localScene;
+
 
 // Forward declarations ======================================================================
 void tempFrame(e_mode tempFrame, e_mode returnFrame, const ulong msTimeout) ;
@@ -121,10 +124,14 @@ void toggleBypass();
 void toggleEffect(int slotNum);
 void cycleMode();
 bool createFolders();
-void textAnimation(const String &s, ulong msDelay);
+void textAnimation(const String &s, ulong msDelay, int yShift, bool show);
 void ESP_off();
+void ESP_on();
 void buildPresetList();
 void updatePresetList(uint8_t numPreset);
+char* localPresetName(int localNum);
+void handlePresets(int x);
+void handleScenes(int x);
 
 // SPARKIE ================================================================================== 
 SparkIO spark_io(false); // do NOT do passthru as only one device here, no serial to the app
@@ -155,13 +162,13 @@ const uint8_t BUTTONS_NUM = 6;
 const uint8_t PEDALS_NUM = 4; //  first N buttons which are not encoders 
 
 s_buttons BUTTONS[BUTTONS_NUM] = {
-//  {BUTTON_NGT_PIN, "NGT", "xxx", 0, 0, 0, false},
-//  {BUTTON_CMP_PIN, "CMP", "xxx", 0, 0, 1, false},
-  {BUTTON1_PIN, "DRV", "DLO", 0, 0, 2, false},
-//  {BUTTON_AMP_PIN, "AMP", "xxx", 0, 0, 3, false},
-  {BUTTON2_PIN, "MOD", "SAV", 0, 0, 4, false},
-  {BUTTON3_PIN, "DLY", "PRV", 0, 0, 5, false},
-  {BUTTON4_PIN, "RVB", "NXT", 0, 0, 6, false},
+//  {BUTTON_NGT_PIN, "NGT", "", 0, 0, 0, false},
+//  {BUTTON_CMP_PIN, "CMP", "", 0, 0, 1, false},
+  {BUTTON1_PIN, "DRV", "1", 0, 0, 2, false},
+//  {BUTTON_AMP_PIN, "AMP", "", 0, 0, 3, false},
+  {BUTTON2_PIN, "MOD", "2", 0, 0, 4, false},
+  {BUTTON3_PIN, "DLY", "3", 0, 0, 5, false},
+  {BUTTON4_PIN, "RVB", "4", 0, 0, 6, false},
   {ENCODER1_SW, "", "", 0, 0, 0, false}, //encoder 1 (may or may not be here)
   {ENCODER2_SW, "", "", 0, 0, 0, false}, //encoder 2 (may or may not be here)
 };
@@ -204,17 +211,9 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
     display->setTextAlignment(TEXT_ALIGN_CENTER);
     display->drawString(display->width()/2 + x, 20 + y, "BYPASS" );
   } else {
-    display->setFont(SMALL_FONT);
-    display->setTextAlignment(TEXT_ALIGN_CENTER);
     int boxWidth = display->getStringWidth("WWW");
     int pxPerLabel = (display->width() - 8) / PEDALS_NUM;
     boxWidth = max(boxWidth,pxPerLabel-2);
-    for (int i=0 ; i<PEDALS_NUM; i++) {
-      if (BUTTONS[i].fxState) {
-        display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
-      }
-      display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].fxLabel));
-    }
     if (localPresetNum<HW_PRESETS) {
       display->drawRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
       display->drawString(boxWidth/2 + x,y + 16 ,"HW");
@@ -245,9 +244,30 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
       display->setFont(BIG_FONT);
       display->drawString(x + scroller + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
     } else {
-      display->setFont(HUGE_FONT);
-      display->setTextAlignment(TEXT_ALIGN_CENTER);
-      display->drawString((display->width())/2 + x, 11 + y, String(localPresetNum+1) );
+      display->setFont(BIG_FONT);
+      display->setTextAlignment(TEXT_ALIGN_RIGHT);
+      int offsetX = display->getStringWidth("00");
+      display->drawString(offsetX + x, 27 + y, String(localPresetNum+1) );
+      display->setFont(MID_FONT);
+      display->setTextAlignment(TEXT_ALIGN_LEFT);
+      offsetX = offsetX + 4;
+      display->drawString(offsetX + x-1, 29 + y, localPresetName(localPresetNum) );
+      display->setFont(SMALL_FONT);
+      display->drawString(offsetX + x, 10 + y, localPresetName(localPresetNum-2) );
+      display->drawString(offsetX + x, 20 + y, localPresetName(localPresetNum-1) );
+      display->drawString(offsetX + x, 45 + y, localPresetName(localPresetNum+1) );
+      display->drawString(offsetX + x, 55 + y, localPresetName(localPresetNum+2) );
+    }
+    display->setColor(BLACK);
+    display->fillRect(x+0, y+0, display->width()-8, 16);
+    display->setFont(SMALL_FONT);
+    display->setColor(INVERSE);
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    for (int i=0 ; i<PEDALS_NUM; i++) {
+      if (BUTTONS[i].fxState) {
+        display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
+      }
+      display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].fxLabel));
     }
   }
 }
@@ -258,12 +278,16 @@ void framePresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
   int boxWidth = display->getStringWidth("WWW");
   boxWidth = max(boxWidth,pxPerLabel-2);
   for (int i=0 ; i<PEDALS_NUM; i++) {
-    display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
-    display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].actLabel));
+    if (i==localPresetNum) {
+      display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
+    } else {
+      display->drawRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
+    } 
+    display->drawString(x+((i+0.5)*pxPerLabel), y, String(i+1));
   }
   display->setFont(HUGE_FONT);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString((display->width())/2 + x, 11 + y, String(localPresetNum+1) );
+  display->drawString((display->width())/2 + x, 11 + y, String(localScene+1) );
 }
 
 
@@ -345,6 +369,8 @@ void setup() {
   ui.init();
   display.flipScreenVertically();
   display.setColor(INVERSE);
+  delay(1000);
+  ESP_on();
   ui.switchToFrame(MODE_ABOUT);// show welcome screen
   ui.update();
 
@@ -535,24 +561,8 @@ btConnected = spark_comms.connected();
 
     x = Encoder2.read(); // preset selector
     if (x) {
-      scroller = 0;
-      scrollStep = -abs(scrollStep);
-      returnToMainUI();
-      if (x == DIR_CW) {
-        localPresetNum++;
-        if (localPresetNum>TOTAL_PRESETS-1) localPresetNum = 0;
-      } else {
-        localPresetNum--;
-        if (localPresetNum<0) localPresetNum=TOTAL_PRESETS-1;
-      }
-      if (localPresetNum < HW_PRESETS ) {
-        remotePresetNum = localPresetNum;
-      } else {
-        remotePresetNum = TMP_PRESET_ADDR;
-      }
-      setPendingPreset(localPresetNum);
-      DEBUG("Pending preset: " + localPresetNum + " to " + String(remotePresetNum,HEX));
-      updateStatuses();
+      if (mode==MODE_EFFECTS) handlePresets(x);
+      if (mode==MODE_PRESETS) handleScenes(x);
     }
     if (millis() > idleCounter && pendingPresetNum >= 0) {
       uploadPreset(localPresetNum);
@@ -635,6 +645,11 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
   if (mode==MODE_PRESETS){
     switch (eventType) {
       case ace_button::AceButton::kEventPressed:
+        if (id<HW_PRESETS){
+          spark_io.change_hardware_preset(id);
+          localPresetNum = id;
+          remotePresetNum = id;
+        }
         break;
       case ace_button::AceButton::kEventLongPressed:
         break;
@@ -774,6 +789,16 @@ void greetings() {
   };
 }
 
+char* localPresetName(int localNum) {
+  if (localNum > TOTAL_PRESETS-1) { localNum = localNum - (TOTAL_PRESETS) ;}
+  if (localNum < 0) {localNum = localNum + TOTAL_PRESETS ;}
+  if (localNum<HW_PRESETS) {
+    return presets[localNum].Name;
+  } else {
+    return flashPresets[localNum-HW_PRESETS].Name;
+  }
+}
+
 s_fx_coords fxNumByName(const char* fxName) {
   int i = 0;
   int j = 3; //3: amp is most often in use 
@@ -904,6 +929,43 @@ void toggleBypass() {
   bypass = !bypass;
 }
 
+void handlePresets(int x) {
+  scroller = 0;
+  scrollStep = -abs(scrollStep);
+  returnToMainUI();
+  if (x == DIR_CW) {
+    localPresetNum++;
+    if (localPresetNum>TOTAL_PRESETS-1) localPresetNum = 0;
+  } else {
+    localPresetNum--;
+    if (localPresetNum<0) localPresetNum=TOTAL_PRESETS-1;
+  }
+  if (localPresetNum < HW_PRESETS ) {
+    remotePresetNum = localPresetNum;
+  } else {
+    remotePresetNum = TMP_PRESET_ADDR;
+  }
+  setPendingPreset(localPresetNum);
+  DEBUG("Pending preset: " + localPresetNum + " to " + String(remotePresetNum,HEX));
+  updateStatuses();
+}
+
+void handleScenes(int x) {
+  scroller = 0;
+  scrollStep = -abs(scrollStep);
+  returnToMainUI();
+  if (x == DIR_CW) {
+    localPresetNum++;
+    if (localScene>TOTAL_SCENES-1) localScene = 0;
+  } else {
+    localScene--;
+    if (localScene<0) localPresetNum=TOTAL_SCENES-1;
+  }
+  //setPendingScene(localScene);
+  DEBUG("Pending scene: " + localScene);
+  updateStatuses();
+}
+
 void toggleEffect(int slotNum) {
   spark_io.turn_effect_onoff(presets[CUR_EDITING].effects[slotNum].EffectName, !presets[CUR_EDITING].effects[slotNum].OnOff);
   presets[CUR_EDITING].effects[slotNum].OnOff = !presets[CUR_EDITING].effects[slotNum].OnOff;
@@ -956,8 +1018,6 @@ SparkPreset somePreset(const char* substTitle) {
 
 SparkPreset loadPresetFromFile(int presetSlot) {
   SparkPreset retPreset;
-  double value;
-  int numParams;
   File presetFile;
   // open dir bound to the slot number
   String dirName =  "/" + (String)(presetSlot) ;
@@ -990,7 +1050,8 @@ SparkPreset loadPresetFromFile(int presetSlot) {
         strcpy(retPreset.UUID, meta["id"]);
         JsonArray sigpath = doc["sigpath"];
         for (int i =0; i<=6; i++) { // effects
-          numParams = 0;
+          int numParams = 0;
+          double value;
           JsonObject fx = sigpath[i];
           for (JsonObject elem : fx["params"].as<JsonArray>()) {
             // clanky PG format sometimes uses double, and sometimes bool as char[]
@@ -1020,23 +1081,25 @@ SparkPreset loadPresetFromFile(int presetSlot) {
   return retPreset;
 }
 
-void textAnimation(const String &s, ulong msDelay) {  
+void textAnimation(const String &s, ulong msDelay, int yShift=0, bool show=true) {  
     display.clear();
-    display.drawString(display.width()/2,display.height()/2-6, s);
-    display.display();
-    delay(msDelay);
+    display.drawString(display.width()/2, display.height()/2-6 + yShift, s);
+    if (show) {
+      display.display();
+      delay(msDelay);
+    }
 }
 
 void ESP_off(){
   //  CRT-off effect =) or something
-  String s = "-----------------";
+  String s = "_________________";
   display.clear();
   display.display();
   display.setFont(MID_FONT);
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   for (int i=0; i<8; i++) {
     s = s.substring(i);
-    textAnimation(s,70);
+    textAnimation(s,70,-6);
   }
   for (int i=0; i<3; i++) {
     textAnimation("\\",30);
@@ -1045,11 +1108,6 @@ void ESP_off(){
     textAnimation("--",30);
   }
   textAnimation("...z-Z-Z",1000);
-  //fade out
-  for(int i = 100; i>10; i--) {
-    display.setContrast(i,2.65*i-24,0.64*i);
-    delay(10);
-  }
   // hopefully displayOff() saves energy
   display.displayOff();
   DEBUG("deep sleep");
@@ -1057,6 +1115,19 @@ void ESP_off(){
   esp_sleep_enable_ext0_wakeup( static_cast <gpio_num_t> (ENCODER2_SW), LOW);
   esp_deep_sleep_start() ;
 };
+
+void ESP_on () {
+  display.setFont(MID_FONT);
+  display.setTextAlignment(TEXT_ALIGN_CENTER);
+  display.setContrast(100);
+  textAnimation(".",200,-4);
+  textAnimation("*",100,5);
+  textAnimation("X",100,2);
+  textAnimation("-}|{-",100);
+  textAnimation("- -X- -",100,2);
+  textAnimation("x",100,0);
+  textAnimation(".",200,-4);
+}
 
 void updatePresetList(uint8_t numPreset) {
     preset = loadPresetFromFile(numPreset);

@@ -955,11 +955,11 @@ void handleScenes(int x) {
   scrollStep = -abs(scrollStep);
   returnToMainUI();
   if (x == DIR_CW) {
-    localPresetNum++;
+    localScene++;
     if (localScene>TOTAL_SCENES-1) localScene = 0;
   } else {
     localScene--;
-    if (localScene<0) localPresetNum=TOTAL_SCENES-1;
+    if (localScene<0) localScene=TOTAL_SCENES-1;
   }
   //setPendingScene(localScene);
   DEBUG("Pending scene: " + localScene);

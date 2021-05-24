@@ -120,46 +120,10 @@ uint8_t chunk_header_from_spark[16]{0x01, 0xfe, 0x00, 0x00, 0x41, 0xff, 0x00, 0x
 
 void SparkIO::process_in_blocks() {
   uint8_t b;
-  bool boo;
+  //bool boo;
 
-  while (comms->bt->available()) {
-    b = comms->bt->read();
-
-    
-    // **** PASSTHROUGH OF SERIAL TO BLUETOOTH ****
-
-    if (pass_through) {
-      if (bt_state == 0 && b == 0x01) 
-        bt_state = 1;
-      else if (bt_state == 1) {
-        if (b == 0xfe) {
-          bt_state = 2;
-          bt_buf[0] = 0x01;
-          bt_buf[1] = 0xfe;
-          bt_pos = 2;
-        }
-        else
-          bt_state = 0;
-      }
-      else if (bt_state == 2) {
-        if (bt_pos == 6) {
-          bt_len = b;
-        }
-        bt_buf[bt_pos++] = b;
-        if (bt_pos == bt_len) {
-          comms->ser->write(bt_buf, bt_pos);
-          bt_pos = 0;
-          bt_len = -1; 
-          bt_state = 0; 
-        }
-      }
-
-      if (bt_pos > MAX_BT_BUFFER) {
-        Serial.println("SPARKIO IO_PROCESS_IN_BLOCKS OVERRUN");
-        while (true);
-      }
-    }
-    // **** END PASSTHROUGH ****
+  while (comms->pReceiver->canRead() ) {
+    b = comms->pReceiver->readValue<uint8_t>();
     
     // check the 7th byte which holds the block length
     if (rb_state == 6) {
@@ -209,12 +173,12 @@ void SparkIO::process_in_blocks() {
 
 void SparkIO::process_in_chunks() {
   uint8_t b;
-  bool boo;
+ //  boo;
   unsigned int len;
   uint8_t len_h, len_l;
 
   while (!in_chunk.is_empty()) {               // && in_message.is_empty()) {  -- no longer needed because in_message is now a proper ringbuffer
-    boo = in_chunk.get(&b);
+    bool boo = in_chunk.get(&b);
     if (!boo) DEBUG("Chunk is_empty was false but the buffer was empty!");
 
     switch (rc_state) {
@@ -925,7 +889,7 @@ void SparkIO::process_out_chunks() {
 
 void SparkIO::process_out_blocks() {
   int i;
-  int len;
+ // int len;
   uint8_t b;  
   uint8_t cmd, sub;
 
@@ -960,10 +924,10 @@ void SparkIO::process_out_blocks() {
     }
     out_block[6] = ob_pos;
 
-    comms->bt->write(out_block, ob_pos);
+    comms->pSender->writeValue(out_block, ob_pos, false);
     DEBUG("SparkIO: sending over BT: " + String(cmd*0x100+sub,HEX));
     ob_last_sent_time = millis();
-    
+
     if (!ob_ok_to_send) {
       DEBUG("Blocked");
     }

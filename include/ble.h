@@ -1,6 +1,4 @@
 #include <Arduino.h>
-#include "Spark.h"
-#include "SparkComms.h"
 #include "NimBLEDevice.h"
 
 void scanEndedCB(NimBLEScanResults results);
@@ -21,7 +19,7 @@ class ClientCallbacks : public NimBLEClientCallbacks {
          *  Min interval: 120 * 1.25ms = 150, Max interval: 120 * 1.25ms = 150, 0 latency, 60 * 10ms = 600ms timeout
          */
     //    pClient->updateConnParams(120,120,0,60);
-        pClient->updateConnParams(48,48,0,60);
+        pClient->updateConnParams(48,60,0,600);
     };
 
     void onDisconnect(NimBLEClient* pClient) {
@@ -74,6 +72,7 @@ class ClientCallbacks : public NimBLEClientCallbacks {
     };
 };
 
+
 /** Define a class to handle the callbacks when advertisments are received */
 class AdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
     void onResult(NimBLEAdvertisedDevice* advertisedDevice) {
@@ -91,37 +90,6 @@ class AdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
     };
 };
 
-bool SparkComms::_btConnected=false;
-
-SparkComms::SparkComms() {
-}
-
-SparkComms::~SparkComms() {
-}
-
-void SparkComms::startBLE() {
-    bt = new NimBLEDevice();
-    bt->init("");
-    bt->setSecurityAuth(/*BLE_SM_PAIR_AUTHREQ_BOND | BLE_SM_PAIR_AUTHREQ_MITM |*/ BLE_SM_PAIR_AUTHREQ_SC);
-    bt->setPower(ESP_PWR_LVL_P9); /** +9db */
-    // bt->addIgnored(NimBLEAddress ("aa:bb:cc:dd:ee:ff"));
-    NimBLEScan* pScan = bt->getScan();
-    /** create a callback that gets called when advertisers are found */
-    pScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks());
-
-    /** Set scan interval (how often) and window (how long) in milliseconds */
-    pScan->setInterval(45);
-    pScan->setWindow(15);
-
-    /** Active scan will gather scan response data from advertisers
-     *  but will use more energy from both devices
-     */
-    pScan->setActiveScan(true);
-    /** Start scanning for advertisers for the scan time specified (in seconds) 0 = forever
-     *  Optional callback for when scanning stops.
-     */
-    pScan->start(scanTime, scanEndedCB);  
-}
 
 /** Notification / Indication receiving handler callback */
 void notifyCB(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify){
@@ -145,8 +113,8 @@ void scanEndedCB(NimBLEScanResults results){
 static ClientCallbacks clientCB;
 
 
-
-bool SparkComms::connect_to_spark() {
+/** Handles the provisioning of clients and connects / interfaces with the server */
+bool connectToServer() {
     NimBLEClient* pClient = nullptr;
 
     /** Check if we have a client we should reuse first **/
@@ -215,21 +183,24 @@ bool SparkComms::connect_to_spark() {
 
     /** Now we can read/write/subscribe the charateristics of the services we are interested in */
     NimBLERemoteService* pService = nullptr;
+    NimBLERemoteCharacteristic* pReceiveBLE = nullptr;
+    NimBLERemoteCharacteristic* pSendBLE = nullptr;
+    NimBLERemoteDescriptor* pDescriptor = nullptr;
 
     pService = pClient->getService("ffc0");
     if(pService) {
-        pSender = pService->getCharacteristic("ffc1");
-        if(pSender) {
-            if(pSender->canRead()) {
-                DEBUG(pSender->getUUID().toString().c_str());
+        pSendBLE = pService->getCharacteristic("ffc1");
+        if(pSendBLE) {
+            if(pSendBLE->canRead()) {
+                DEBUG(pSendBLE->getUUID().toString().c_str());
                 DEBUG(" Value: ");
-                DEBUG(pSender->readValue().c_str());
+                DEBUG(pSendBLE->readValue().c_str());
             }
         }
-        pReceiver = pService->getCharacteristic("ffc2");
-        if(pReceiver) {
-            if(pReceiver->canNotify()) {
-                if(!pReceiver->subscribe(true, notifyCB)) {
+        pReceiveBLE = pService->getCharacteristic("ffc2");
+        if(pReceiveBLE) {
+            if(pReceiveBLE->canNotify()) {
+                if(!pReceiveBLE->subscribe(true, notifyCB, true)) {
                     pClient->disconnect();
                     return false;
                 }
@@ -241,6 +212,4 @@ bool SparkComms::connect_to_spark() {
 
     DEBUG("BLE characteristics established");
     return true;
-};
-
-
+}

@@ -2,29 +2,33 @@
 #define SparkComms_h
 
 #include <Arduino.h>
-#define HW_BAUD 1000000
 
-#include "BluetoothSerial.h"
+#include "NimBLEDevice.h"
+#define  SPARK_NAME  "Spark 40 BLE"
+#define  MY_NAME     "BLE_Pedal"
 
-// Bluetooth vars
-#define  SPARK_NAME  "Spark 40 Audio"
-#define  MY_NAME     "EasySpark"
+#ifdef DEBUG_ENABLE
+#define DEBUG(x) Serial.println((String)(millis()/1000) + "s. " + x)
+#else
+#define DEBUG(x)
+#endif
 
 class SparkComms {
   public:
     SparkComms();
     ~SparkComms();
 
-    void start_ser();
-    void start_bt();
+    void startBLE();
     bool connect_to_spark();
     bool connected() {return _btConnected;} ;
     // bluetooth communications
 
-    BluetoothSerial *bt;
-    HardwareSerial *ser;
+    NimBLEDevice *bt;
+    NimBLEClient *pClient;
+    NimBLERemoteService *pService;
+    NimBLERemoteCharacteristic *pSender;
+    NimBLERemoteCharacteristic *pReceiver;
     static bool _btConnected; 
 };
-
 
 #endif

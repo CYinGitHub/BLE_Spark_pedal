@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <FS.h>
-#include "BluetoothSerial.h" 
 #include "AceButton.h"
 #include "MD_REncoder.h"
 // Spark*.* is a portion from Paul Hamshere https://github.com/paulhamsh/
@@ -63,7 +62,7 @@ presets[]
 #define HARD_PRESETS 24  // number of hard-coded presets in SparkPresets.h
 #define FLASH_PRESETS 50  // number of presets stored in on-board flash
 #define TOTAL_PRESETS HW_PRESETS + FLASH_PRESETS
-#define TOTAL_SCENES 50 // number of 4-efx combinations to store
+#define TOTAL_SCENES 10 // number of 4-efx combinations to store
 #define TRANSITION_TIME 200 //(ms) ui slide effect timing
 #define FRAME_TIMEOUT 3000 //(ms) to return to main UI from temporary UI frame 
 #define SMALL_FONT ArialMT_Plain_10
@@ -117,7 +116,7 @@ void stopWaiting();
 bool blinkOn() {if(round(millis()/400)*400 != round(millis()/300)*300 ) return true; else return false;}
 bool triggedOn() {if(round(millis()/2000)*2000 != round(millis()/1000)*1000 ) return true; else return false;}
 void setPendingPreset(int localNum);
-void updateStatuses();
+void updateFxStatuses();
 void uploadPreset(int localNum);
 s_fx_coords fxNumByName(const char* fxName);
 void toggleBypass();
@@ -345,13 +344,6 @@ int frameCount = 7;
 OverlayCallback overlays[] = { screenOverlay };
 int overlaysCount = 1;
 
-
-// BLUETOOTH Init ============================================================================
-#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
-#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
-#endif
-
-
 // SETUP() WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
 void setup() { 
   Serial.begin(115200);
@@ -397,11 +389,12 @@ void setup() {
 
   // Check FS
   LITTLEFS.begin();
-  if(!LITTLEFS.exists("/" + (String)(TOTAL_PRESETS-1))) {
+  if(!LITTLEFS.exists("/" + (String)(TOTAL_PRESETS-1)) || !LITTLEFS.exists("/s" + (String)(TOTAL_SCENES-1))) {
     createFolders();
   }
+
   spark_io.comms = &spark_comms;
-  spark_comms.start_bt();
+  spark_comms.startBLE();
 
   DEBUG("Setup(): done");
 }
@@ -437,7 +430,7 @@ btConnected = spark_comms.connected();
           p = CUR_EDITING;
         }
         presets[p] = preset;
-        updateStatuses();
+        updateFxStatuses();
         //dump_preset(preset);
       }
 
@@ -476,7 +469,7 @@ btConnected = spark_comms.connected();
         if (remotePresetNum == TMP_PRESET_ADDR) {
           //
         }
-        updateStatuses();
+        updateFxStatuses();
         DEBUG("Change to hw preset: " + remotePresetNum);
       }
       
@@ -507,11 +500,11 @@ btConnected = spark_comms.connected();
 
         }
         DEBUG("Store in preset: " + remotePresetNum);
-        updateStatuses();
+        updateFxStatuses();
       }
 
       if (cmdsub == 0x0415) {
-        updateStatuses();
+        updateFxStatuses();
         DEBUG("OnOff: ACK");
       }
       if (cmdsub == 0x0310) {
@@ -523,7 +516,7 @@ btConnected = spark_comms.connected();
           remotePresetNum = CUR_EDITING;
         localPresetNum = remotePresetNum;
         presets[CUR_EDITING] = presets[remotePresetNum];
-        updateStatuses();
+        updateFxStatuses();
         DEBUG("Hadware preset is: " + remotePresetNum);
       }
     }
@@ -673,7 +666,7 @@ void btConnect() {
     ui.update(); 
     DEBUG("Connecting... >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
     btConnected = spark_comms.connect_to_spark();
-    if (btConnected && spark_comms.bt->hasClient()) {
+    if (btConnected ) {
       DEBUG("BT Connected");      
       btCaption = "RETRIEVING..";
       greetings();
@@ -759,7 +752,7 @@ void stopWaiting() {
   stillWaiting = false;
 }
 
-void updateStatuses() {
+void updateFxStatuses() {
   for (int i=0 ; i< PEDALS_NUM; i++) {
     BUTTONS[i].fxState = presets[CUR_EDITING].effects[BUTTONS[i].fxSlotNumber].OnOff;
   }
@@ -910,7 +903,7 @@ void uploadPreset(int presetNum) {
     // make it active
     spark_io.change_hardware_preset(TMP_PRESET_ADDR);
   }
-  updateStatuses();
+  updateFxStatuses();
   pendingPresetNum = -1;
 }
 
@@ -947,12 +940,10 @@ void handlePresets(int x) {
   }
   setPendingPreset(localPresetNum);
   DEBUG("Pending preset: " + localPresetNum + " to " + String(remotePresetNum,HEX));
-  updateStatuses();
+  updateFxStatuses();
 }
 
 void handleScenes(int x) {
-  scroller = 0;
-  scrollStep = -abs(scrollStep);
   returnToMainUI();
   if (x == DIR_CW) {
     localScene++;
@@ -963,14 +954,14 @@ void handleScenes(int x) {
   }
   //setPendingScene(localScene);
   DEBUG("Pending scene: " + localScene);
-  updateStatuses();
+  updateFxStatuses();
 }
 
 void toggleEffect(int slotNum) {
   spark_io.turn_effect_onoff(presets[CUR_EDITING].effects[slotNum].EffectName, !presets[CUR_EDITING].effects[slotNum].OnOff);
   presets[CUR_EDITING].effects[slotNum].OnOff = !presets[CUR_EDITING].effects[slotNum].OnOff;
   DEBUG(String(presets[CUR_EDITING].effects[slotNum].EffectName));
-  updateStatuses();
+  updateFxStatuses();
 }
 
 void cycleMode(){
@@ -1001,6 +992,11 @@ void cycleMode(){
 bool createFolders() {
   bool noErr = true;
   for (int i=HW_PRESETS; i<TOTAL_PRESETS;i++) {
+    if (!LITTLEFS.exists("/"+(String)i)) {
+      noErr = noErr && LITTLEFS.mkdir("/"+(String)i);
+    }
+  }
+  for (int i=0; i<TOTAL_SCENES;i++) {
     if (!LITTLEFS.exists("/"+(String)i)) {
       noErr = noErr && LITTLEFS.mkdir("/"+(String)i);
     }

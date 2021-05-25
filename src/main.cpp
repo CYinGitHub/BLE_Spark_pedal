@@ -57,7 +57,7 @@ presets[]
 #define BUTTON2_PIN 26
 #define BUTTON3_PIN 27
 #define BUTTON4_PIN 14
-#define BT_ATTEMPTS_BEFORE_OFF 3
+#define BT_ATTEMPTS_BEFORE_OFF 200
 #define HW_PRESETS 4  // 4 hardware presets in amp
 #define HARD_PRESETS 24  // number of hard-coded presets in SparkPresets.h
 #define FLASH_PRESETS 50  // number of presets stored in on-board flash
@@ -77,7 +77,7 @@ enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ORGANIZE, MODE_SETTI
 e_mode mode = MODE_CONNECT;
 e_mode returnFrame = MODE_EFFECTS;  // we should memorize where to return
 const char* DEVICE_NAME = "Pedal for Spark";
-const char* VERSION = "0.7a";
+const char* VERSION = "0.7BLE";
 const uint8_t MAX_LEVEL = 100; // maximum level of effect, actual value in UI is level divided by 100
 bool btConnected = false;
 int scroller=0, scrollStep = -2; // speed of scrolling tone names
@@ -667,7 +667,8 @@ void btConnect() {
     DEBUG("Connecting... >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
     btConnected = spark_comms.connect_to_spark();
     if (btConnected ) {
-      DEBUG("BT Connected");      
+      DEBUG("BT Connected"); 
+      btAttempts = 0;     
       btCaption = "RETRIEVING..";
       greetings();
       mode = MODE_EFFECTS;
@@ -998,7 +999,7 @@ bool createFolders() {
   }
   for (int i=0; i<TOTAL_SCENES;i++) {
     if (!LITTLEFS.exists("/"+(String)i)) {
-      noErr = noErr && LITTLEFS.mkdir("/"+(String)i);
+      noErr = noErr && LITTLEFS.mkdir("/s"+(String)i);
     }
   }
   return noErr;

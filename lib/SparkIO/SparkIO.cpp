@@ -121,10 +121,9 @@ uint8_t chunk_header_from_spark[16]{0x01, 0xfe, 0x00, 0x00, 0x41, 0xff, 0x00, 0x
 void SparkIO::process_in_blocks() {
   uint8_t b;
   //bool boo;
-
-  while (comms->pReceiver->canRead() ) {
-    b = comms->pReceiver->readValue<uint8_t>();
-    
+  while (comms->rcv_pos <= comms->rcv_length ) {
+    b = (comms->rcv_buffer[comms->rcv_pos]);
+    comms->rcv_pos++; 
     // check the 7th byte which holds the block length
     if (rb_state == 6) {
       rb_len = b - 16;
@@ -923,7 +922,6 @@ void SparkIO::process_out_blocks() {
       out_block[ob_pos++] = b;
     }
     out_block[6] = ob_pos;
-
     comms->pSender->writeValue(out_block, ob_pos, false);
     DEBUG("SparkIO: sending over BT: " + String(cmd*0x100+sub,HEX));
     ob_last_sent_time = millis();

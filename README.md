@@ -25,7 +25,8 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 ## TODO
 
 *   Storing presets in ESP's filesystem (partially done)
-*   Implement "PRESETS" mode (mixed with SCENES, in progress)
+*   Implement "PRESETS" mode (merged with SCENES, in progress)
+*   "SCENES" mode. Switching between 4-preset combinations (In progress).
 *   Implement "ORGANIZE" mode (not gonna be here)
 *   Implement "SETTINGS" mode
 *   Accessing presets thru web-based UI via WiFi.
@@ -34,7 +35,6 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 *   Attaching addressable RGB LEDs.
 *   Change to BLE (done, debugging).
 *   Battery power supply and maybe battery management (In progress, probably will only work with Heltec).
-*   "SCENES" mode. Switching between 4-preset combinations (In progress).
 
 ## Hardware
 

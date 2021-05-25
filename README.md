@@ -38,6 +38,23 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 *   Change to BLE (done, debugging).
 *   Battery power supply and maybe battery management (In progress, probably will only work with Heltec).
 
+## HowTo
+
+[PlatformIO](https://platformio.org) is the recommended IDE for build and upload. It is a free add-on for MS VSCode which makes coding much simplier and satisfying.
+
+1. Follow the instructions to install [VSCode and PlatformIO](https://platformio.org/install/ide?install=vscode)
+2. Install Git
+    - On Windows, install git from https://git-scm.com/download/win
+    - On macOS, install Command Line Tools for Xcode running `xcode-select --install` via Terminal. Remember to run the command every time you update your macOS.
+3. Launch VSCode and run the following commands (you can type there or select commands from the list):
+    - from View->Command Palette... (Ctrl+Shift+P)
+        - Git: Clone
+        - You will be asked for the URL of the remote repository (<https://github.com/copych/BLE_Spark_pedal>) and the directory to place the local repository.
+    - At the top left find PlatformIO->Project Tasks and select your environment (i.e. esp32doit-devkit-v1)
+        - Click "Build" under General
+        - Click "Upload" under General
+        - Click “Upload File System Image” under Platform. (!!! CRITICAL !!! DON'T SKIP THIS STEP !!!)
+
 ## Hardware
 
 Wiring coming soon

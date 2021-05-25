@@ -68,7 +68,7 @@ void SparkComms::notifyCB(NimBLERemoteCharacteristic* pRemoteCharacteristic, uin
         Serial.print(rcv_buffer[i], HEX);
     }
 */
-    delay(5); //breath
+    delay(5); //breath (I DON'T KNOW WHY, BUT THIS IMPROVES STABILITY. )
     rcv_pos = 0; //later maybe use queue
 }
 

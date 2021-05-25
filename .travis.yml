@@ -16,6 +16,6 @@ install:
     - pio update
 
 script:
-  - platformio ci --lib="lib/SparkIO" --lib="lib/BluetoothSerial" --lib="include" --project-conf=travis.ini
+  - platformio ci --lib="lib/SparkIO" --lib="include" --project-conf=travis.ini
     
     

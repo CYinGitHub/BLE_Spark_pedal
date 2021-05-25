@@ -1,4 +1,4 @@
-# Bluetooth pedal for the PG Spark Amp
+# Bluetooth Low Energy (BLE) pedal for the PG Spark Amp
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/ea220b14059e479ab6a0419a1c4935f8)](https://www.codacy.com/gh/copych/BT_Spark_pedal/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=copych/BT_Spark_pedal&amp;utm_campaign=Badge_Grade)
 [![](https://www.travis-ci.com/copych/BT_Spark_pedal.svg?branch=master)](https://www.travis-ci.com/github/copych/BT_Spark_pedal)
@@ -12,32 +12,29 @@ It now can handle some basic functions:
     *   Long pressing the first button invokes amp info screen
     *   Long pressing the second button: bypassing all the 7 effects, and then any button returns the amp to the previous state
 
-*   "PRESETS" mode: switching between four hardware presets
-    *   Not implemented
-
-*   "ORGANIZE" mode: saving, loading presets, or whatever one may need to do with presets...
-    *   Not implemented
+*   "PRESETS" mode: switching between four configured presets as fast as Spark can. Switch between such configurations.
+    *   In progress
 
 *   "SETTINGS" mode: some parameters stored in flash
     *   Not implemented   
 
-It's gonna be a standalone bluetooth footswitch for Spark amp to use in "gig mode", ie to switch between tones (4 stored within the amp, and a reasonable number, say 20, 50 or 100 of presets stored in on-board flash), or just turn On/Off effects inside a tone with just one tap.
+It's gonna be a standalone BLE footswitch for Spark amp to use in "gig mode", ie to switch between tones (4 stored within the amp, and a reasonable number, say 20, 50 or 100 of presets stored in on-board flash), or just turn On/Off effects inside a tone with just one tap.
 
 These presets will probably be accessible via the on-board web server thru WiFi connection (AP/Infrastructure mode). Or in some other way.
 
 ## TODO
 
-*   Storing presets in ESP's filesystem
-*   Implement "PRESETS" mode
-*   Implement "ORGANIZE" mode
+*   Storing presets in ESP's filesystem (partially done)
+*   Implement "PRESETS" mode (mixed with SCENES, in progress)
+*   Implement "ORGANIZE" mode (not gonna be here)
 *   Implement "SETTINGS" mode
-*   Accessing presets thru web-based UI via WiFi
-*   Storing master volume for every preset slot in flash
+*   Accessing presets thru web-based UI via WiFi.
+*   Storing master volume for every preset slot in flash.
 *   There's a raw idea of auto-normalizing presets' master volumes.
-*   Attaching addressable RGB LEDs
-*   Battery power supply and maybe battery management
-*   Switching from BluetoothSerial to BLE
-*   (?) "Scenes" mode. Remember the setups within one Tone and map them to the buttons. Switching between such scenes should be (or not: subject to test) fast enough to perform live.
+*   Attaching addressable RGB LEDs.
+*   Change to BLE (done, debugging).
+*   Battery power supply and maybe battery management (In progress, probably will only work with Heltec).
+*   "SCENES" mode. Switching between 4-preset combinations (In progress).
 
 ## Hardware
 

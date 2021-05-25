@@ -121,7 +121,7 @@ uint8_t chunk_header_from_spark[16]{0x01, 0xfe, 0x00, 0x00, 0x41, 0xff, 0x00, 0x
 void SparkIO::process_in_blocks() {
   uint8_t b;
   //bool boo;
-  while (comms->rcv_pos <= comms->rcv_length ) {
+  while (comms->rcv_pos < comms->rcv_length ) {
     b = (comms->rcv_buffer[comms->rcv_pos]);
     comms->rcv_pos++; 
     // check the 7th byte which holds the block length
@@ -164,6 +164,8 @@ void SparkIO::process_in_blocks() {
       if (b == chunk_header_from_spark[0]) 
         rb_state = 1;
   }
+  comms->rcv_pos = 0;
+  comms->rcv_length = 0;
 }
 
 //
@@ -779,7 +781,7 @@ void SparkIO::create_preset(SparkPreset *preset)
 
 void SparkIO::out_store(uint8_t b)
 {
-  uint8_t bits;
+//  uint8_t bits;
   
   if (oc_bit_mask == 0x80) {
     oc_bit_mask = 1;
@@ -807,7 +809,7 @@ void SparkIO::out_store(uint8_t b)
 
 
 void SparkIO::process_out_chunks() {
-  int i, j, len;
+  int i,  len;
   int checksum_pos;
   uint8_t b;
   uint8_t len_h, len_l;
@@ -890,7 +892,7 @@ void SparkIO::process_out_blocks() {
   int i;
  // int len;
   uint8_t b;  
-  uint8_t cmd, sub;
+  uint8_t cmd=0, sub=0;
 
   while (!out_chunk.is_empty() && ob_ok_to_send) {
     ob_pos = 16;

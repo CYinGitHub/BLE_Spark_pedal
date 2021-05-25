@@ -998,7 +998,7 @@ bool createFolders() {
     }
   }
   for (int i=0; i<TOTAL_SCENES;i++) {
-    if (!LITTLEFS.exists("/"+(String)i)) {
+    if (!LITTLEFS.exists("/s"+(String)i)) {
       noErr = noErr && LITTLEFS.mkdir("/s"+(String)i);
     }
   }
@@ -1009,7 +1009,6 @@ SparkPreset somePreset(const char* substTitle) {
   SparkPreset ret_preset = *my_presets[random(HARD_PRESETS-1)];
   strcpy(ret_preset.Description, ret_preset.Name);
   strcpy(ret_preset.Name, substTitle);
-  DEBUG("Subst Preset: " + substTitle);
   return ret_preset;
 }
 
@@ -1026,6 +1025,7 @@ SparkPreset loadPresetFromFile(int presetSlot) {
     while (!fileName.endsWith(".json")) {
       presetFile = dir.openNextFile();
       if (!presetFile) {
+        DEBUG(">>>> '" + dirName + "' Empty Slot < Random");
         return somePreset("(Empty Slot)");
       }
       fileName = presetFile.name();
@@ -1076,6 +1076,13 @@ SparkPreset loadPresetFromFile(int presetSlot) {
   }
   presetFile.close();
   return retPreset;
+}
+
+bool savePresetToFile(SparkPreset savedPreset, const String &filePath) {
+  if(strcmp(savedPreset.Name,"(Empty Slot)")==0){
+    strcpy(savedPreset.Name,savedPreset.Description);
+  }
+  
 }
 
 void textAnimation(const String &s, ulong msDelay, int yShift=0, bool show=true) {  

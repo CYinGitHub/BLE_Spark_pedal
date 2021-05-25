@@ -62,7 +62,7 @@ void SparkComms::startBLE() {
 void SparkComms::notifyCB(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify){
     // As we have one-by-one byte reading already implemented, lazy approach is to set up the buffer 
     // to store what we receive and then feed it to the existing function
-    DEBUG("Notify callback");
+    // DEBUG("Notify callback");
     if (length<RCV_BUFF_MAX) memcpy(&rcv_buffer, pData, length);
     rcv_length = length;
     rcv_pos = 0; //later maybe use queue

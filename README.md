@@ -3,7 +3,9 @@
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/ea220b14059e479ab6a0419a1c4935f8)](https://www.codacy.com/gh/copych/BT_Spark_pedal/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=copych/BT_Spark_pedal&amp;utm_campaign=Badge_Grade)
 [![](https://www.travis-ci.com/copych/BT_Spark_pedal.svg?branch=master)](https://www.travis-ci.com/github/copych/BT_Spark_pedal)
 
-It now can handle some basic functions:
+As it uses BLE (ie connects to " Spark 40 BLE" device), at the same time the app can stream audio to "Spark 40 Audio" device. 
+
+What it can for the time being:
 
 *   "EFFECTS" mode: on-off individual effecs in a chain
     *   The first rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX
@@ -52,7 +54,7 @@ Hardware in the photos:
 
 ## Credits/Thanks
 
-*   PositiveGrid for their Spark 40 Amp.
+*   Positive Grid for their Spark 40 Amp. "Positive Grid", "Spark" and other trade marks belong to their respected owners.
 *   Paul Hamshere https://github.com/paulhamsh/ for his system approach and a great reverse engineering job. This project is based on forked SparkIO, SparkComms and some of his other classes.
 *   Christopher Cook https://github.com/soundshed for the great desktop app for playing with the amp, and for some code look-up.
 *   Kevin McGladdery for the pedal example

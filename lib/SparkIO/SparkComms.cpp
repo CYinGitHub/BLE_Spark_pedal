@@ -17,11 +17,9 @@ bool SparkComms::doConnect = false;
 uint32_t SparkComms::scanTime = 10; // (s) 0 = scan forever
 
 
-/*
-// Create a single global instance of the callback class to be used by all clients 
-static ClientCallbacks clientCB;
+static SparkComms::ClientCallbacks clientCB;
 
-*/
+
 
 /** Define a class to handle the callbacks when advertisments are received */
 
@@ -65,6 +63,12 @@ void SparkComms::notifyCB(NimBLERemoteCharacteristic* pRemoteCharacteristic, uin
     // DEBUG("Notify callback");
     if (length<RCV_BUFF_MAX) memcpy(&rcv_buffer, pData, length);
     rcv_length = length;
+/*    for (int i = 0; i<length; i++) {
+        Serial.print(" ");
+        Serial.print(rcv_buffer[i], HEX);
+    }
+*/
+    delay(5); //breath
     rcv_pos = 0; //later maybe use queue
 }
 
@@ -99,10 +103,9 @@ bool SparkComms::connect_to_spark() {
             }
             pClient = NimBLEDevice::createClient();
             DEBUG("New client created");
-    //       pClient->setClientCallbacks(&clientCB, false);
+            pClient->setClientCallbacks(&clientCB, false);
             pClient->setConnectionParams(12,12,0,51);
             pClient->setConnectTimeout(5);
-
 
             if (!pClient->connect(advDevice)) {
 
@@ -131,9 +134,6 @@ bool SparkComms::connect_to_spark() {
             pSender = pService->getCharacteristic("ffc1");
             if(pSender) {
                 if(pSender->canRead()) {
-                    // DEBUG(pSender->getUUID().toString().c_str());
-                   // DEBUG(" Value: ");
-                   // DEBUG(pSender->readValue().c_str());
                 }
             }
             pReceiver = pService->getCharacteristic("ffc2");
@@ -173,4 +173,30 @@ void SparkComms::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* adv
         doConnect = true;
         }
     }
+};
+
+void SparkComms::ClientCallbacks::onConnect(NimBLEClient* pClient) {
+    DEBUG("Connected");
+
+ //   pClient->updateConnParams(120,120,0,60);
+//    pClient->updateConnParams(36,36,0,60);
+};
+
+void SparkComms::ClientCallbacks::onDisconnect(NimBLEClient* pClient) {
+    DEBUG(pClient->getPeerAddress().toString().c_str());
+    DEBUG(" Disconnected - Starting scan");
+    //    NimBLEDevice::getScan()->start(scanTime, scanEndedCB);
+};
+
+bool SparkComms::ClientCallbacks::onConnParamsUpdateRequest(NimBLEClient* pClient, const ble_gap_upd_params* params) {
+    if(params->itvl_min < 24) { // 1.25ms units 
+        return false;
+    } else if(params->itvl_max > 48) { // 1.25ms units 
+        return false;
+    } else if(params->latency > 2) { // Number of intervals allowed to skip 
+        return false;
+    } else if(params->supervision_timeout > 100) { // 10ms units 
+        return false;
+    }
+    return true;
 };

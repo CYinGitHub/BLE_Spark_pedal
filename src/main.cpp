@@ -131,6 +131,8 @@ void updatePresetList(uint8_t numPreset);
 char* localPresetName(int localNum);
 void handlePresets(int x);
 void handleScenes(int x);
+SparkPreset loadPresetFromFile(int slot);
+bool savePresetToFile(SparkPreset savedPreset, const String &filePath);
 
 // SPARKIE ================================================================================== 
 SparkIO spark_io(false); // do NOT do passthru as only one device here, no serial to the app
@@ -645,6 +647,9 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
         }
         break;
       case ace_button::AceButton::kEventLongPressed:
+        if (id<PEDALS_NUM) {
+          savePresetToFile(presets[CUR_EDITING],"");
+        }
         break;
       case ace_button::AceButton::kEventClicked:
         break;
@@ -741,7 +746,7 @@ bool waitForResponse(unsigned int subcmd=0, ulong msTimeout=1000) {
   }
   while (stillWaiting && millis()<waitCounter) {  loop(); }
   if (stillWaiting) { 
-    DEBUG("No Response! TIMED OUT!");
+    DEBUG("No Response! TIMED OUT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     return false;
   } else {
     return true;
@@ -1046,12 +1051,12 @@ SparkPreset loadPresetFromFile(int presetSlot) {
         strcpy(retPreset.Icon, meta["icon"]);
         strcpy(retPreset.UUID, meta["id"]);
         JsonArray sigpath = doc["sigpath"];
-        for (int i =0; i<=6; i++) { // effects
+        for (int i=0; i<=6; i++) { // effects
           int numParams = 0;
           double value;
           JsonObject fx = sigpath[i];
           for (JsonObject elem : fx["params"].as<JsonArray>()) {
-            // clanky PG format sometimes uses double, and sometimes bool as char[]
+            // <-----> PG format sometimes uses double, and sometimes bool as char[]
             if ( elem["value"].is<bool>() ) {
               if (elem["value"]) {
                 value = 0.5;
@@ -1079,10 +1084,32 @@ SparkPreset loadPresetFromFile(int presetSlot) {
 }
 
 bool savePresetToFile(SparkPreset savedPreset, const String &filePath) {
+  bool noErr = true;
   if(strcmp(savedPreset.Name,"(Empty Slot)")==0){
     strcpy(savedPreset.Name,savedPreset.Description);
   }
-  
+  DynamicJsonDocument doc(3072);
+  doc["type"] = "jamup_speaker";
+  doc["bpm"] = savedPreset.BPM;
+  JsonObject meta = doc.createNestedObject("meta");
+  meta["id"] = savedPreset.UUID;
+  meta["version"] = savedPreset.Version;
+  meta["icon"] = savedPreset.Icon;
+  meta["name"] = savedPreset.Name;
+  meta["description"] = savedPreset.Description;
+  JsonArray sigpath = doc.createNestedArray("sigpath");
+  for (int i=0; i<7; i++){
+    //JsonArray params = sigpath[i].createNestedArray("params");
+    for (int j=0; j<savedPreset.effects[i].NumParameters; j++) {
+      sigpath[i]["params"][j]["index"] = j;
+      sigpath[i]["params"][j]["value"] = savedPreset.effects[i].Parameters[j];
+    }
+    sigpath[i]["type"] = "speaker_fx";
+    sigpath[i]["dspId"] = savedPreset.effects[i].EffectName;
+    sigpath[i]["active"] = savedPreset.effects[i].OnOff;
+  }
+  serializeJson(doc,Serial);
+  return noErr;
 }
 
 void textAnimation(const String &s, ulong msDelay, int yShift=0, bool show=true) {  

@@ -133,8 +133,7 @@ void SparkIO::process_in_blocks() {
     else if (rb_state >= 0 && rb_state < 16) {
       if (b == chunk_header_from_spark[rb_state]) {
         rb_state++;
-      }
-      else {
+      } else {
         Serial.print (rb_state);
         Serial.print(" ");
         Serial.print(b);
@@ -142,7 +141,7 @@ void SparkIO::process_in_blocks() {
         Serial.print(rb_len);
         Serial.println();
         rb_state = -1;
-        DEBUG("SparkIO bad block header");
+        DEBUG("SparkIO bad block header !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
       }
     } 
     // and once past the header just read the next bytes as defined by rb_len
@@ -237,7 +236,7 @@ void SparkIO::process_in_chunks() {
           rc_state = 0;
           if (!rc_multi_chunk || (rc_this_chunk == rc_total_chunks-1)) { //last chunk in message
             if (in_message_bad) {
-              DEBUG("Bad message, dropped");
+              DEBUG("Bad message, dropped !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
               in_message.drop();
             }
             else {

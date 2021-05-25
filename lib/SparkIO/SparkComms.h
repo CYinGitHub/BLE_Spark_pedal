@@ -41,42 +41,15 @@ class SparkComms {
     static size_t rcv_pos; //read position
     static uint8_t rcv_buffer[RCV_BUFF_MAX]; // buffer byte-array
 
-
     class AdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
       void onResult(NimBLEAdvertisedDevice* advertisedDevice) ;
     };
 
-    /*
-    class ClientCallbacks : public NimBLEClientCallbacks {
-      void onConnect(NimBLEClient* pClient) {
-        DEBUG("Connected");
-
-      //    pClient->updateConnParams(120,120,0,60);
-      //    pClient->updateConnParams(36,36,0,60);
-      };
-
-      void onDisconnect(NimBLEClient* pClient) {
-        DEBUG(pClient->getPeerAddress().toString().c_str());
-        DEBUG(" Disconnected - Starting scan");
-      //    NimBLEDevice::getScan()->start(scanTime, scanEndedCB);
-      };
-
-      bool onConnParamsUpdateRequest(NimBLEClient* pClient, const ble_gap_upd_params* params) {
-        if(params->itvl_min < 24) { // 1.25ms units 
-          return false;
-        } else if(params->itvl_max > 48) { // 1.25ms units 
-          return false;
-        } else if(params->latency > 2) { // Number of intervals allowed to skip 
-          return false;
-        } else if(params->supervision_timeout > 100) { // 10ms units 
-          return false;
-        }
-        return true;
-      };
+    class ClientCallbacks: public NimBLEClientCallbacks {
+      void onConnect(NimBLEClient* pClient);
+      void onDisconnect(NimBLEClient* pClient);
+      bool onConnParamsUpdateRequest(NimBLEClient* pClient, const ble_gap_upd_params* params);
     };
-    */
-
 };
-
 
 #endif

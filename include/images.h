@@ -1,3 +1,4 @@
+// logos for oled display
 #define WiFi_Logo_width 60
 #define WiFi_Logo_height 36
 const uint8_t WiFi_Logo_bits[] PROGMEM = {

@@ -57,7 +57,9 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 
 ## Hardware
 
-Wiring coming soon
+Wiring:
+
+![](/images/BLE_pedal_bb.png)
 
 Hardware in the photos:
 

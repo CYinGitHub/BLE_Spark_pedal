@@ -1,7 +1,7 @@
 # Bluetooth Low Energy (BLE) pedal for the PG Spark Amp
 
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/ea220b14059e479ab6a0419a1c4935f8)](https://www.codacy.com/gh/copych/BT_Spark_pedal/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=copych/BT_Spark_pedal&amp;utm_campaign=Badge_Grade)
-[![](https://www.travis-ci.com/copych/BT_Spark_pedal.svg?branch=master)](https://www.travis-ci.com/github/copych/BT_Spark_pedal)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/ea220b14059e479ab6a0419a1c4935f8)](https://www.codacy.com/gh/copych/BLE_Spark_pedal/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=copych/BLE_Spark_pedal&amp;utm_campaign=Badge_Grade)
+[![](https://www.travis-ci.com/copych/BLE_Spark_pedal.svg?branch=withBLE)](https://www.travis-ci.com/github/copych/BLE_Spark_pedal)
 
 As it uses BLE (ie connects to " Spark 40 BLE" device), at the same time the app can stream audio to "Spark 40 Audio" device. 
 

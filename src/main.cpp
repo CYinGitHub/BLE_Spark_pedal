@@ -13,6 +13,8 @@
 
 /*  
       Some explanations
+I am not a native programmer, so my C/C++ code looks more like VB =) sorry for that
+I just tried to make it work, to look pretty and to eliminate errors/warnings.
 This project is located here: https://github.com/copych/BT_Spark_pedal
 Initial hardware build included:
   - DOIT ESP32 DevKit v1 : 1pcs
@@ -24,6 +26,10 @@ presets[]
  0,1,2,3 : slots 0x000-0x0003 hardware presets, associated with the amp's buttons
  4 : slot 0x007f used by the app (and this program) to hold temporary preset
  5 : slot 0x01XX (current state) - current preset + all the unsaved editing on the amp
+
+You may (or may not) find usefull a couple of methods which works with PG json files:
+loadPresetFromFile()
+savePresetToFile()
 */
 #ifdef SSD1306WIRE //which of the OLED displays you use: these global def's are in platformio.ini
   #include "SSD1306Wire.h"
@@ -1017,6 +1023,7 @@ SparkPreset somePreset(const char* substTitle) {
   return ret_preset;
 }
 
+// load preset from json file in the format used by PG cloud back-up
 SparkPreset loadPresetFromFile(int presetSlot) {
   SparkPreset retPreset;
   File presetFile;
@@ -1030,6 +1037,7 @@ SparkPreset loadPresetFromFile(int presetSlot) {
     while (!fileName.endsWith(".json")) {
       presetFile = dir.openNextFile();
       if (!presetFile) {
+        // no preset found in current slot directory, let's substitute a random one
         DEBUG(">>>> '" + dirName + "' Empty Slot < Random");
         return somePreset("(Empty Slot)");
       }
@@ -1083,6 +1091,7 @@ SparkPreset loadPresetFromFile(int presetSlot) {
   return retPreset;
 }
 
+// save preset to json file in the format used by PG cloud back-up
 bool savePresetToFile(SparkPreset savedPreset, const String &filePath) {
   bool noErr = true;
   if(strcmp(savedPreset.Name,"(Empty Slot)")==0){
@@ -1099,7 +1108,6 @@ bool savePresetToFile(SparkPreset savedPreset, const String &filePath) {
   meta["description"] = savedPreset.Description;
   JsonArray sigpath = doc.createNestedArray("sigpath");
   for (int i=0; i<7; i++){
-    //JsonArray params = sigpath[i].createNestedArray("params");
     for (int j=0; j<savedPreset.effects[i].NumParameters; j++) {
       sigpath[i]["params"][j]["index"] = j;
       sigpath[i]["params"][j]["value"] = savedPreset.effects[i].Parameters[j];

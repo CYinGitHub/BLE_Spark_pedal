@@ -141,7 +141,8 @@ bool SparkComms::connect_to_spark() {
                 if(pReceiver->canNotify()) {
                     if(!pReceiver->subscribe(true, notifyCB, true)) {
                         pClient->disconnect();
-                        return false;
+                        _btConnected = false;
+                        return _btConnected;
                     }
                 }
             }
@@ -183,6 +184,7 @@ void SparkComms::ClientCallbacks::onConnect(NimBLEClient* pClient) {
 };
 
 void SparkComms::ClientCallbacks::onDisconnect(NimBLEClient* pClient) {
+    _btConnected = false;
     DEBUG(pClient->getPeerAddress().toString().c_str());
     DEBUG(" Disconnected - Starting scan");
     //    NimBLEDevice::getScan()->start(scanTime, scanEndedCB);

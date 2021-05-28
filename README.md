@@ -24,7 +24,7 @@ It's gonna be a standalone BLE footswitch for Spark amp to use in "gig mode", ie
 
 These presets will probably be accessible via the on-board web server thru WiFi connection (AP/Infrastructure mode). Or in some other way.
 
-## TODO
+## ToDo
 
 *   Storing presets in ESP's filesystem (partially done)
 *   Implement "PRESETS" mode (merged with SCENES, in progress)

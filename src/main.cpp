@@ -51,8 +51,14 @@ savePresetToFile()
 #endif
 
 // GENERAL AND GLOBALS ======================================================================= 
+#ifdef BOARD_DEVKIT
 #define DISPLAY_SCL 22
 #define DISPLAY_SDA 21
+#endif
+#ifdef BOARD_LITE
+#define DISPLAY_SCL 22
+#define DISPLAY_SDA 23
+#endif
 #define ENCODER1_CLK 5 // note that GPIO5 is HardwareSerial(2) RX, don't use them together
 #define ENCODER1_DT 18 // note that GPIO18 is HardwareSerial(2) TX, don't use them together
 #define ENCODER1_SW 19
@@ -77,16 +83,17 @@ savePresetToFile()
 #define HUGE_FONT Roboto_Mono_Medium_52
 
 // a lot of globals, I know it's not that much elegant 
-enum e_amp_presets {HW_PRESET_0,HW_PRESET_1,HW_PRESET_2,HW_PRESET_3,TMP_PRESET,CUR_EDITING, TMP_PRESET_ADDR=0x007f};
+enum e_amp_presets {HW_PRESET_0,HW_PRESET_1,HW_PRESET_2,HW_PRESET_3,TMP_PRESET,CUR_EDITING,TMP_PRESET_ADDR=0x007f};
 // these numbers correspond to frame numbers of the UI (frames[])
-enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_ORGANIZE, MODE_SETTINGS, MODE_ABOUT, MODE_LEVEL}; 
+enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_INFO, MODE_SETTINGS, MODE_ABOUT, MODE_LEVEL}; 
 e_mode mode = MODE_CONNECT;
 e_mode returnFrame = MODE_EFFECTS;  // we should memorize where to return
 const char* DEVICE_NAME = "Pedal for Spark";
-const char* VERSION = "0.7BLE";
+const char* VERSION = "0.8BLE";
 const uint8_t MAX_LEVEL = 100; // maximum level of effect, actual value in UI is level divided by 100
 bool btConnected = false;
 int scroller=0, scrollStep = -2; // speed of scrolling tone names
+int vScroller=0;
 ulong scrollCounter;
 ulong idleCounter; // for pending tone change 
 ulong waitCounter;
@@ -98,6 +105,7 @@ bool tempUI = false;
 int p, j, curKnob=0, curFx=3, curParam=4, level = 0;
 String ampName="", serialNum="", firmwareVer="" ; //sorry for the Strings, I hope this won't crash the pedal =)
 String btCaption, fxCaption="MASTER";
+String infoCaption, infoText;
 volatile ulong safeRecursion=0;
 int pendingPresetNum = -1 ;
 int localPresetNum; 
@@ -108,7 +116,6 @@ int btAttempts;
 SparkPreset flashPresets[FLASH_PRESETS];
 int localScene;
 
-
 // Forward declarations ======================================================================
 void tempFrame(e_mode tempFrame, e_mode returnFrame, const ulong msTimeout) ;
 void returnToMainUI();
@@ -116,7 +123,7 @@ void handleButtonEvent(ace_button::AceButton*, uint8_t, uint8_t);
 void btConnect();
 void btInit();
 void dump_preset(SparkPreset);
-void greetings();
+bool greetings();
 bool waitForResponse(unsigned int subcmd, ulong msTimeout);
 void stopWaiting();
 bool blinkOn() {if(round(millis()/400)*400 != round(millis()/300)*300 ) return true; else return false;}
@@ -139,6 +146,7 @@ void handlePresets(int x);
 void handleScenes(int x);
 SparkPreset loadPresetFromFile(int slot);
 bool savePresetToFile(SparkPreset savedPreset, const String &filePath);
+void changeKnobFx(int dir);
 
 // SPARKIE ================================================================================== 
 SparkIO spark_io(false); // do NOT do passthru as only one device here, no serial to the app
@@ -251,19 +259,28 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
       display->setFont(BIG_FONT);
       display->drawString(x + scroller + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
     } else {
-      display->setFont(BIG_FONT);
+      if (vScroller !=0) {
+      if ( millis() > scrollCounter ) {
+          vScroller = vScroller - ((vScroller > 0) - (vScroller < 0));
+          scrollCounter = millis() + 20;
+        }
+      }
       display->setTextAlignment(TEXT_ALIGN_RIGHT);
+      display->setFont(BIG_FONT);
       int offsetX = display->getStringWidth("00");
       display->drawString(offsetX + x, 27 + y, String(localPresetNum+1) );
-      display->setFont(MID_FONT);
       display->setTextAlignment(TEXT_ALIGN_LEFT);
-      offsetX = offsetX + 4;
-      display->drawString(offsetX + x-1, 29 + y, localPresetName(localPresetNum) );
       display->setFont(SMALL_FONT);
-      display->drawString(offsetX + x, 10 + y, localPresetName(localPresetNum-2) );
-      display->drawString(offsetX + x, 20 + y, localPresetName(localPresetNum-1) );
-      display->drawString(offsetX + x, 45 + y, localPresetName(localPresetNum+1) );
-      display->drawString(offsetX + x, 55 + y, localPresetName(localPresetNum+2) );
+      display->drawString(offsetX + x+4, 10 + y + vScroller, localPresetName(localPresetNum-2) );
+      display->drawString(offsetX + x+4, 20 + y + vScroller, localPresetName(localPresetNum-1) );
+      display->drawString(offsetX + x+4, 45 + y + vScroller, localPresetName(localPresetNum+1) );
+      display->drawString(offsetX + x+4, 55 + y + vScroller, localPresetName(localPresetNum+2) );
+      display->setColor(BLACK);
+      display->fillRect(x+offsetX, y+31, display->width()-offsetX, 15);
+      display->setFont(MID_FONT);
+      display->setColor(INVERSE);
+      offsetX = offsetX + 4;
+      display->drawString(offsetX + x-1, 29 + y , localPresetName(localPresetNum) );
     }
     display->setColor(BLACK);
     display->fillRect(x+0, y+0, display->width()-8, 16);
@@ -297,12 +314,14 @@ void framePresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
   display->drawString((display->width())/2 + x, 11 + y, String(localScene+1) );
 }
 
-
-void frameOrganize(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+void frameInfo(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   //
-  display->setFont(HUGE_FONT);
+  display->setFont(SMALL_FONT);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString((display->width())/2 + x, 11 + y, "ORG" );
+  display->drawString(display->width()/2 + x,  y, infoCaption);
+  display->setFont(BIG_FONT);
+  display->setTextAlignment(TEXT_ALIGN_CENTER);
+  display->drawString((display->width())/2 + x, 20 + y, infoText );
 }
 
 void frameSettings(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
@@ -343,7 +362,7 @@ void frameLevel(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
 } 
 
 // array of frame drawing functions
-FrameCallback frames[] = { frameBtConnect, frameEffects, framePresets, frameOrganize, frameSettings, frameAbout, frameLevel };
+FrameCallback frames[] = { frameBtConnect, frameEffects, framePresets, frameInfo, frameSettings, frameAbout, frameLevel };
 
 // number of frames in UI
 int frameCount = 7;
@@ -564,6 +583,7 @@ btConnected = spark_comms.connected();
     if (x) {
       if (mode==MODE_EFFECTS) handlePresets(x);
       if (mode==MODE_PRESETS) handleScenes(x);
+      if (mode==MODE_LEVEL) changeKnobFx((x==DIR_CW)?(+1):(-1));
     }
     if (millis() > idleCounter && pendingPresetNum >= 0) {
       uploadPreset(localPresetNum);
@@ -591,14 +611,7 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
 //  uint8_t ledPin = BUTTONS[id].ledAddr;
   if (mode == MODE_LEVEL) {
     if (id==4 && eventType==ace_button::AceButton::kEventPressed) {
-      curKnob++;
-      if (curKnob>=knobs_number) curKnob=0;
-      curFx = knobs_order[curKnob].fxSlot;
-      curParam = knobs_order[curKnob].fxNumber;
-      fxCaption = spark_knobs[curFx][curParam];
-      level = presets[CUR_EDITING].effects[curFx].Parameters[curParam] * 100;
-      timeToGoBack = millis() + FRAME_TIMEOUT;
-      DEBUG(curKnob);
+      changeKnobFx(+1);
     }
   }
   if (eventType == ace_button::AceButton::kEventClicked) {
@@ -654,7 +667,10 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
         break;
       case ace_button::AceButton::kEventLongPressed:
         if (id<PEDALS_NUM) {
-          savePresetToFile(presets[CUR_EDITING],"");
+          infoCaption = "SCENE " + String(localScene);
+          infoText = "Saving: " + String(id+1); 
+          tempFrame(MODE_INFO, MODE_PRESETS, 1000);
+          savePresetToFile(presets[CUR_EDITING], "/s" + String(localScene) + "/" + String(id+1) + ".json");
         }
         break;
       case ace_button::AceButton::kEventClicked:
@@ -757,6 +773,7 @@ bool waitForResponse(unsigned int subcmd=0, ulong msTimeout=1000) {
   } else {
     return true;
   }
+
 }
 
 void stopWaiting() {
@@ -770,28 +787,55 @@ void updateFxStatuses() {
   }
 }
 
-void greetings() {
-  spark_io.get_name();
-  waitForResponse(spark_io.expectedSubcmd,2000);
-  spark_io.greeting();
-  spark_io.get_serial();
-  waitForResponse(spark_io.expectedSubcmd,2000);
-  spark_io.get_preset_details(0x0000);
-  waitForResponse(spark_io.expectedSubcmd,2000);
-  spark_io.get_preset_details(0x0001);
-  waitForResponse(spark_io.expectedSubcmd,2000);
-  spark_io.get_preset_details(0x0002);
-  waitForResponse(spark_io.expectedSubcmd,2000);
-  spark_io.get_preset_details(0x0003);
-  waitForResponse(spark_io.expectedSubcmd,2000);
-  spark_io.get_hardware_preset_number();
-  waitForResponse(spark_io.expectedSubcmd,2000);
-  spark_io.get_firmware_ver();
-  waitForResponse(spark_io.expectedSubcmd,2000);
-  spark_io.get_preset_details(0x0100);
-  if (!waitForResponse(spark_io.expectedSubcmd,2000)) {
-    // Spark might have been stuck
-  };
+bool greetings() {
+  int maxRetries = 3; 
+  int retryN = maxRetries ;
+  do {
+    spark_io.get_name();
+    retryN--; 
+  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+  if (retryN <=0) return false;
+  retryN = maxRetries ;
+  do {
+  spark_io.greeting(); // no response
+  spark_io.get_serial(); 
+  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+  if (retryN <=0) return false;
+  retryN = maxRetries ;
+  do {
+    spark_io.get_preset_details(0x0000); 
+  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+  if (retryN <=0) return false;
+  retryN = maxRetries ;
+  do {  
+    spark_io.get_preset_details(0x0001); 
+  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+  if (retryN <=0) return false;
+  retryN = maxRetries ;
+  do {
+    spark_io.get_preset_details(0x0002); 
+  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+  if (retryN <=0) return false;
+  retryN = maxRetries ;
+  do {
+    spark_io.get_preset_details(0x0003); 
+  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+  if (retryN <=0) return false;
+  retryN = maxRetries ;
+  do {
+    spark_io.get_hardware_preset_number(); 
+  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+  if (retryN <=0) return false;
+  retryN = maxRetries ;
+  do {
+    spark_io.get_firmware_ver(); 
+  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+  if (retryN <=0) return false;
+  retryN = maxRetries ;
+  do {
+    spark_io.get_preset_details(0x0100); 
+  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+  if (retryN <=0) return false; else return true;
 }
 
 char* localPresetName(int localNum) {
@@ -941,9 +985,11 @@ void handlePresets(int x) {
   if (x == DIR_CW) {
     localPresetNum++;
     if (localPresetNum>TOTAL_PRESETS-1) localPresetNum = 0;
+    vScroller = -10;
   } else {
     localPresetNum--;
     if (localPresetNum<0) localPresetNum=TOTAL_PRESETS-1;
+    vScroller = 10;
   }
   if (localPresetNum < HW_PRESETS ) {
     remotePresetNum = localPresetNum;
@@ -982,18 +1028,19 @@ void cycleMode(){
   case MODE_LEVEL:
   case MODE_ABOUT:
   case MODE_EFFECTS:
+    ui.setFrameAnimation(SLIDE_RIGHT);
     mode=MODE_PRESETS;
     break;
   case MODE_PRESETS:
-    mode=MODE_ORGANIZE;
-    break;
-  case MODE_ORGANIZE:
+    ui.setFrameAnimation(SLIDE_RIGHT);
     mode=MODE_SETTINGS;
     break;
   case MODE_SETTINGS:
+    ui.setFrameAnimation(SLIDE_RIGHT);
     mode=MODE_EFFECTS;
     break;
   default:
+    ui.setFrameAnimation(SLIDE_LEFT);
     mode=MODE_EFFECTS;
     break;
   }
@@ -1116,7 +1163,8 @@ bool savePresetToFile(SparkPreset savedPreset, const String &filePath) {
     sigpath[i]["dspId"] = savedPreset.effects[i].EffectName;
     sigpath[i]["active"] = savedPreset.effects[i].OnOff;
   }
-  serializeJson(doc,Serial);
+  File fJson = LITTLEFS.open(filePath,"w");
+  noErr = serializeJson(doc, fJson);
   return noErr;
 }
 
@@ -1179,4 +1227,16 @@ void buildPresetList() {
     updatePresetList(i);
     //dump_preset(preset);
   }
+}
+
+void changeKnobFx(int changeDirection) {
+  curKnob = curKnob + changeDirection;
+  if (curKnob>=knobs_number) curKnob=0;
+  if (curKnob<0) curKnob=knobs_number-1;
+  curFx = knobs_order[curKnob].fxSlot;
+  curParam = knobs_order[curKnob].fxNumber;
+  fxCaption = spark_knobs[curFx][curParam];
+  level = presets[CUR_EDITING].effects[curFx].Parameters[curParam] * 100;
+  timeToGoBack = millis() + FRAME_TIMEOUT;
+  DEBUG(curKnob);
 }

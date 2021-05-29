@@ -3,12 +3,12 @@
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/ea220b14059e479ab6a0419a1c4935f8)](https://www.codacy.com/gh/copych/BT_Spark_pedal/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=copych/BT_Spark_pedal&amp;utm_campaign=Badge_Grade)
 [![](https://www.travis-ci.com/copych/BT_Spark_pedal.svg?branch=master)](https://www.travis-ci.com/github/copych/BT_Spark_pedal)
 
-As it uses BLE (ie connects to " Spark 40 BLE" device), at the same time the app can stream audio to "Spark 40 Audio" device. 
+As it now uses BLE it's possible to connect both mobile app and this pedal to Spark Amp. To do this you should first connect the pedal, and then launch the app, skipping the connect option. After that manually connect "Spark 40 Audio" to your mobile/tablet. Done, you can use audio/video options of the app, and all you have in the pedal. Note, that Tonecloud and preset editing from the app ain't available in this mode.
 
 What it can for the time being:
 
 *   "EFFECTS" mode: on-off individual effecs in a chain
-    *   The first rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX
+    *   The first rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX. During this operation the second encoder changes to prev/next FX knobs. 
     *   The second encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet. Pushing it envokes not-implemented-yet PRESETS mode )
     *   The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
     *   Long pressing the first button invokes amp info screen
@@ -38,7 +38,7 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 *   Change to BLE (done, debugging).
 *   Battery power supply and maybe battery management (In progress, probably will only work with Heltec).
 
-## HowTo
+## Software HowTo
 
 [PlatformIO](https://platformio.org) is the recommended IDE for build and upload. It is a free add-on for MS VSCode which makes coding much simplier and satisfying.
 
@@ -55,11 +55,14 @@ These presets will probably be accessible via the on-board web server thru WiFi 
         - Click "Upload" under General
         - Click “Upload File System Image” under Platform. (!!! CRITICAL !!! DON'T SKIP THIS STEP !!!)
 
-## Hardware
+## Hardware HowTo
 
 Wiring:
 
 ![](/images/BLE_pedal_bb.png)
+
+![](/images/2021-05-09%2018-23-49.JPG)
+![](/images/2021-05-09%2018-24-17.JPG)
 
 Hardware in the photos:
 
@@ -68,8 +71,6 @@ Hardware in the photos:
 *   2 rotary encoders with buttons
 *   SSD1306 duo-color OLED display (just top 16 lines of pixels are always yelow, and the rest are always blue, you can't manage individual pixel color)
 
-![](/images/2021-05-09%2018-23-49.JPG)
-![](/images/2021-05-09%2018-24-17.JPG)
 
 ## Credits/Thanks
 

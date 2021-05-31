@@ -8,8 +8,9 @@ As it now uses BLE it's possible to connect both mobile app and this pedal to Sp
 What it can for the time being:
 *   ALL MODES
     *   The first rotary encoder is changing FX parameters like amp's knobs do (plus drive). Pushing encoder selects next FX. During this operation the second encoder changes to prev/next FX knobs
+    *   Pushing the second encoder cycle modes
 *   "EFFECTS" mode: on-off individual effecs in a chain
-    *   The second encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet. Pushing it envokes not-implemented-yet SCENES mode )
+    *   The second encoder changes presets: first four is hardware (in-amp), the rest are stored in flash. Pushing this encoder invokes not-implemented-yet SCENES mode )
     *   The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
     *   Long pressing the first button invokes amp info screen
     *   Long pressing the second button: bypassing all the 7 effects, and then any button returns the amp to the previous state

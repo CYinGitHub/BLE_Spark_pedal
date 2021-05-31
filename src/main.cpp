@@ -69,7 +69,7 @@ savePresetToFile()
 #define BUTTON2_PIN 26
 #define BUTTON3_PIN 27
 #define BUTTON4_PIN 14
-#define BT_ATTEMPTS_BEFORE_OFF 200
+#define BT_ATTEMPTS_BEFORE_OFF 300
 #define HW_PRESETS 4  // 4 hardware presets in amp
 #define HARD_PRESETS 24  // number of hard-coded presets in SparkPresets.h
 #define FLASH_PRESETS 50  // number of presets stored in on-board flash
@@ -85,7 +85,7 @@ savePresetToFile()
 // a lot of globals, I know it's not that much elegant 
 enum e_amp_presets {HW_PRESET_0,HW_PRESET_1,HW_PRESET_2,HW_PRESET_3,TMP_PRESET,CUR_EDITING,TMP_PRESET_ADDR=0x007f};
 // these numbers correspond to frame numbers of the UI (frames[])
-enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_PRESETS, MODE_INFO, MODE_SETTINGS, MODE_ABOUT, MODE_LEVEL}; 
+enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_SCENES, MODE_INFO, MODE_SETTINGS, MODE_ABOUT, MODE_LEVEL}; 
 e_mode mode = MODE_CONNECT;
 e_mode returnFrame = MODE_EFFECTS;  // we should memorize where to return
 const char* DEVICE_NAME = "Pedal for Spark";
@@ -109,12 +109,14 @@ String infoCaption, infoText;
 volatile ulong safeRecursion=0;
 int pendingPresetNum = -1 ;
 int localPresetNum; 
+int pendingSceneNum = -2; // -1 is for 4 HW presets
+int localSceneNum;
 uint8_t remotePresetNum;
 bool fxState[] = {false,false,false,false,false,false,false}; // array to store FX's on/off state before total bypass is ON
 bool bypass=false;
+bool showScene = true;
 int btAttempts;
 SparkPreset flashPresets[FLASH_PRESETS];
-int localScene;
 
 // Forward declarations ======================================================================
 void tempFrame(e_mode tempFrame, e_mode returnFrame, const ulong msTimeout) ;
@@ -129,6 +131,7 @@ void stopWaiting();
 bool blinkOn() {if(round(millis()/400)*400 != round(millis()/300)*300 ) return true; else return false;}
 bool triggedOn() {if(round(millis()/2000)*2000 != round(millis()/1000)*1000 ) return true; else return false;}
 void setPendingPreset(int localNum);
+void setPendingScene(int scnNum);
 void updateFxStatuses();
 void uploadPreset(int localNum);
 s_fx_coords fxNumByName(const char* fxName);
@@ -147,6 +150,9 @@ void handleScenes(int x);
 SparkPreset loadPresetFromFile(int slot);
 bool savePresetToFile(SparkPreset savedPreset, const String &filePath);
 void changeKnobFx(int dir);
+void loadPresets(int scnNum);
+void parseJsonPreset(File &presetFile, SparkPreset &retPreset);
+
 
 // SPARKIE ================================================================================== 
 SparkIO spark_io(false); // do NOT do passthru as only one device here, no serial to the app
@@ -156,6 +162,7 @@ unsigned int cmdsub;
 SparkMessage msg;
 SparkPreset preset;
 SparkPreset presets[6];
+SparkPreset scenePresets[4];
 
 ulong last_millis;
 int my_state;
@@ -261,8 +268,8 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
     } else {
       if (vScroller !=0) {
       if ( millis() > scrollCounter ) {
-          vScroller = vScroller - ((vScroller > 0) - (vScroller < 0));
-          scrollCounter = millis() + 20;
+          vScroller = vScroller - 2*((vScroller > 0) - (vScroller < 0));
+          scrollCounter = millis() + 15;
         }
       }
       display->setTextAlignment(TEXT_ALIGN_RIGHT);
@@ -271,12 +278,12 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
       display->drawString(offsetX + x, 27 + y, String(localPresetNum+1) );
       display->setTextAlignment(TEXT_ALIGN_LEFT);
       display->setFont(SMALL_FONT);
-      display->drawString(offsetX + x+4, 10 + y + vScroller, localPresetName(localPresetNum-2) );
-      display->drawString(offsetX + x+4, 20 + y + vScroller, localPresetName(localPresetNum-1) );
-      display->drawString(offsetX + x+4, 45 + y + vScroller, localPresetName(localPresetNum+1) );
-      display->drawString(offsetX + x+4, 55 + y + vScroller, localPresetName(localPresetNum+2) );
+      display->drawString(offsetX + x+6, 10 + y + vScroller, localPresetName(localPresetNum-2) );
+      display->drawString(offsetX + x+6, 20 + y + vScroller, localPresetName(localPresetNum-1) );
+      display->drawString(offsetX + x+6, 45 + y + vScroller, localPresetName(localPresetNum+1) );
+      display->drawString(offsetX + x+6, 55 + y + vScroller, localPresetName(localPresetNum+2) );
       display->setColor(BLACK);
-      display->fillRect(x+offsetX, y+31, display->width()-offsetX, 15);
+      display->fillRect(x+offsetX, y+31, display->width()-offsetX, 17);
       display->setFont(MID_FONT);
       display->setColor(INVERSE);
       offsetX = offsetX + 4;
@@ -296,7 +303,8 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
   }
 }
 
-void framePresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+void frameScenes(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+  display->setTextAlignment(TEXT_ALIGN_CENTER);
   display->setFont(SMALL_FONT);
   int pxPerLabel = (display->width() - 8) / PEDALS_NUM;
   int boxWidth = display->getStringWidth("WWW");
@@ -309,9 +317,16 @@ void framePresets(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
     } 
     display->drawString(x+((i+0.5)*pxPerLabel), y, String(i+1));
   }
-  display->setFont(HUGE_FONT);
-  display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString((display->width())/2 + x, 11 + y, String(localScene+1) );
+  if (showScene) {
+    display->drawRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
+    display->drawString(boxWidth/2 + x,y + 16 ,"SCN");
+    display->setFont(HUGE_FONT);
+    if (localSceneNum>-1) {
+      display->drawString((display->width())/2 + x, 11 + y, String(localSceneNum+1) );
+    } else {
+      display->drawString((display->width())/2 + x, 11 + y, "HW" );
+    }
+  }
 }
 
 void frameInfo(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
@@ -362,7 +377,7 @@ void frameLevel(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
 } 
 
 // array of frame drawing functions
-FrameCallback frames[] = { frameBtConnect, frameEffects, framePresets, frameInfo, frameSettings, frameAbout, frameLevel };
+FrameCallback frames[] = { frameBtConnect, frameEffects, frameScenes, frameInfo, frameSettings, frameAbout, frameLevel };
 
 // number of frames in UI
 int frameCount = 7;
@@ -483,7 +498,7 @@ btConnected = spark_comms.connected();
           //suppress the message "BPM=10.0"
         } else {
           level = msg.val * 100;
-          tempFrame(MODE_LEVEL,mode,1000);
+          tempFrame(MODE_LEVEL,mode,FRAME_TIMEOUT);
         }
       }
       
@@ -582,11 +597,14 @@ btConnected = spark_comms.connected();
     x = Encoder2.read(); // preset selector
     if (x) {
       if (mode==MODE_EFFECTS) handlePresets(x);
-      if (mode==MODE_PRESETS) handleScenes(x);
+      if (mode==MODE_SCENES) handleScenes(x);
       if (mode==MODE_LEVEL) changeKnobFx((x==DIR_CW)?(+1):(-1));
     }
     if (millis() > idleCounter && pendingPresetNum >= 0) {
       uploadPreset(localPresetNum);
+    }
+    if (millis() > idleCounter && pendingSceneNum >= -1) {
+      loadPresets(localSceneNum);
     }
   }
   if ((millis() > timeToGoBack) && tempUI) {
@@ -607,22 +625,22 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
     returnToMainUI();
   } 
   DEBUG("Button: id: " + (String)id + " eventType: " + (String)eventType + "; buttonState: " + (String)buttonState );
-
-//  uint8_t ledPin = BUTTONS[id].ledAddr;
   if (mode == MODE_LEVEL) {
     if (id==4 && eventType==ace_button::AceButton::kEventPressed) {
       changeKnobFx(+1);
+      return;
     }
   }
   if (eventType == ace_button::AceButton::kEventClicked) {
     if (id==5) {
       cycleMode();
+      return;
     }
-  }
-  
+  }  
   if (eventType == ace_button::AceButton::kEventLongPressed) {
     if (id==5) {
       ESP_off();
+      return;
     }
   }
   if (mode==MODE_EFFECTS) {
@@ -655,29 +673,35 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
       case ace_button::AceButton::kEventDoubleClicked:
         break;
     }
+    return;
   }
-  if (mode==MODE_PRESETS){
+  if (mode==MODE_SCENES){
     switch (eventType) {
-      case ace_button::AceButton::kEventPressed:
-        if (id<HW_PRESETS){
-          spark_io.change_hardware_preset(id);
-          localPresetNum = id;
-          remotePresetNum = id;
+      case ace_button::AceButton::kEventClicked:
+        if (localSceneNum==-1) {
+          if (id<HW_PRESETS){
+            spark_io.change_hardware_preset(id);
+            localPresetNum = id;
+            remotePresetNum = id;
+          }
+        } else {
+          // intelligent changing presets
+          localPresetNum = -1;
+          remotePresetNum = TMP_PRESET_ADDR;
         }
         break;
       case ace_button::AceButton::kEventLongPressed:
         if (id<PEDALS_NUM) {
-          infoCaption = "SCENE " + String(localScene);
+          infoCaption = "SCENE " + String(localSceneNum);
           infoText = "Saving: " + String(id+1); 
-          tempFrame(MODE_INFO, MODE_PRESETS, 1000);
-          savePresetToFile(presets[CUR_EDITING], "/s" + String(localScene) + "/" + String(id+1) + ".json");
+          tempFrame(MODE_INFO, MODE_SCENES, 1000);
+          savePresetToFile(presets[CUR_EDITING], "/s" + String(localSceneNum) + "/" + String(id) + ".json");
         }
-        break;
-      case ace_button::AceButton::kEventClicked:
         break;
       case ace_button::AceButton::kEventDoubleClicked:
         break;
     }
+    return;
   }
 }
 
@@ -937,6 +961,11 @@ void setPendingPreset(int presetNum) {
     idleCounter = millis() + 600 ; // let's make some idle check before sending the preset to the amp
 }
 
+void setPendingScene(int scnNum) {
+    pendingSceneNum = scnNum;
+    idleCounter = millis() + 200 ; // let's make some idle check before trying to load scene data
+}
+
 void uploadPreset(int presetNum) {
   localPresetNum = presetNum;
   if (presetNum < HW_PRESETS ) {
@@ -945,9 +974,6 @@ void uploadPreset(int presetNum) {
     presets[CUR_EDITING] = presets[presetNum];
   } else {
     remotePresetNum = TMP_PRESET_ADDR;
-    // upload presets from ESP32's filesystem to TMP_PRESET_ADDR slot
-    // TODO read preset #localPresetNum from LITTLEFS
- //   preset = *my_presets[presetNum-HW_PRESETS];
     preset = flashPresets[presetNum-HW_PRESETS];
     DEBUG(">>>>>uploading '" + preset.Name + "' to 0x007f");
     // change preset.number to 0x007f
@@ -961,6 +987,16 @@ void uploadPreset(int presetNum) {
   }
   updateFxStatuses();
   pendingPresetNum = -1;
+}
+
+void loadPresets(int scnNum) {
+  for (int i=0; i<4; i++) {
+    File jsonFile = LITTLEFS.open("/s" + String(scnNum) + "/" + String(i) + ".json");
+    parseJsonPreset(jsonFile, scenePresets[i]);
+    jsonFile.close();
+  }
+  localSceneNum = scnNum;
+  pendingSceneNum = -2;
 }
 
 void toggleBypass() {
@@ -985,11 +1021,11 @@ void handlePresets(int x) {
   if (x == DIR_CW) {
     localPresetNum++;
     if (localPresetNum>TOTAL_PRESETS-1) localPresetNum = 0;
-    vScroller = -10;
+    vScroller = 10;
   } else {
     localPresetNum--;
     if (localPresetNum<0) localPresetNum=TOTAL_PRESETS-1;
-    vScroller = 10;
+    vScroller = -10;
   }
   if (localPresetNum < HW_PRESETS ) {
     remotePresetNum = localPresetNum;
@@ -1004,14 +1040,14 @@ void handlePresets(int x) {
 void handleScenes(int x) {
   returnToMainUI();
   if (x == DIR_CW) {
-    localScene++;
-    if (localScene>TOTAL_SCENES-1) localScene = 0;
+    localSceneNum++;
+    if (localSceneNum>TOTAL_SCENES-1) localSceneNum = -1;
   } else {
-    localScene--;
-    if (localScene<0) localScene=TOTAL_SCENES-1;
+    localSceneNum--;
+    if (localSceneNum<-1) localSceneNum=TOTAL_SCENES-1;
   }
-  //setPendingScene(localScene);
-  DEBUG("Pending scene: " + localScene);
+  setPendingScene(localSceneNum);
+  DEBUG("Pending scene: " + localSceneNum);
   updateFxStatuses();
 }
 
@@ -1028,11 +1064,11 @@ void cycleMode(){
   case MODE_LEVEL:
   case MODE_ABOUT:
   case MODE_EFFECTS:
-    ui.setFrameAnimation(SLIDE_RIGHT);
-    mode=MODE_PRESETS;
+    ui.setFrameAnimation(SLIDE_LEFT);
+    mode=MODE_SCENES;
     break;
-  case MODE_PRESETS:
-    ui.setFrameAnimation(SLIDE_RIGHT);
+  case MODE_SCENES:
+    ui.setFrameAnimation(SLIDE_LEFT);
     mode=MODE_SETTINGS;
     break;
   case MODE_SETTINGS:
@@ -1040,10 +1076,11 @@ void cycleMode(){
     mode=MODE_EFFECTS;
     break;
   default:
-    ui.setFrameAnimation(SLIDE_LEFT);
+    ui.setFrameAnimation(SLIDE_RIGHT);
     mode=MODE_EFFECTS;
     break;
   }
+  ui.update();
   ui.transitionToFrame(mode);
   ui.update();
 }
@@ -1092,50 +1129,54 @@ SparkPreset loadPresetFromFile(int presetSlot) {
       DEBUG(">>>>>>>>>>>>>>>>>> '" + fileName + "'");
     }
     dir.close();
-    DynamicJsonDocument doc(3072);
-    DeserializationError error = deserializeJson(doc, presetFile);
-    if (error) {
-      return somePreset("(Invalid json file)");
-    } else {
-      if (doc["type"] == "jamup_speaker") { // PG app's json
-        retPreset.BPM = doc["bpm"];
-        JsonObject meta = doc["meta"];
-        strcpy(retPreset.Name, meta["name"]);
-        strcpy(retPreset.Description, meta["description"]);
-        strcpy(retPreset.Version, meta["version"]);
-        strcpy(retPreset.Icon, meta["icon"]);
-        strcpy(retPreset.UUID, meta["id"]);
-        JsonArray sigpath = doc["sigpath"];
-        for (int i=0; i<=6; i++) { // effects
-          int numParams = 0;
-          double value;
-          JsonObject fx = sigpath[i];
-          for (JsonObject elem : fx["params"].as<JsonArray>()) {
-            // <-----> PG format sometimes uses double, and sometimes bool as char[]
-            if ( elem["value"].is<bool>() ) {
-              if (elem["value"]) {
-                value = 0.5;
-              } else {
-                value = 0;
-              }
-            } else { // let's hope they don't invent some other type
-              value = elem["value"]; 
-            }
-            int index = elem["index"];
-            retPreset.effects[i].Parameters[index] = value;
-            numParams = max(numParams,index);
-          }
-          retPreset.effects[i].NumParameters = numParams+1;
-          strcpy(retPreset.effects[i].EffectName , fx["dspId"]);
-          retPreset.effects[i].OnOff = fx["active"];
-          retPreset.preset_num = 0;
-          retPreset.curr_preset = 0;
-        }   
-      }
-    }
+    parseJsonPreset(presetFile, retPreset);
   }
   presetFile.close();
   return retPreset;
+}
+
+void parseJsonPreset(File &presetFile, SparkPreset &retPreset) {
+  DynamicJsonDocument doc(3072);
+  DeserializationError error = deserializeJson(doc, presetFile);
+  if (error) {
+    retPreset = somePreset("(Invalid json file)");
+  } else {
+    if (doc["type"] == "jamup_speaker") { // PG app's json
+      retPreset.BPM = doc["bpm"];
+      JsonObject meta = doc["meta"];
+      strcpy(retPreset.Name, meta["name"]);
+      strcpy(retPreset.Description, meta["description"]);
+      strcpy(retPreset.Version, meta["version"]);
+      strcpy(retPreset.Icon, meta["icon"]);
+      strcpy(retPreset.UUID, meta["id"]);
+      JsonArray sigpath = doc["sigpath"];
+      for (int i=0; i<=6; i++) { // effects
+        int numParams = 0;
+        double value;
+        JsonObject fx = sigpath[i];
+        for (JsonObject elem : fx["params"].as<JsonArray>()) {
+          // <-----> PG format sometimes uses double, and sometimes bool as char[]
+          if ( elem["value"].is<bool>() ) {
+            if (elem["value"]) {
+              value = 0.5;
+            } else {
+              value = 0;
+            }
+          } else { // let's hope they don't invent some other type
+            value = elem["value"]; 
+          }
+          int index = elem["index"];
+          retPreset.effects[i].Parameters[index] = value;
+          numParams = max(numParams,index);
+        }
+        retPreset.effects[i].NumParameters = numParams+1;
+        strcpy(retPreset.effects[i].EffectName , fx["dspId"]);
+        retPreset.effects[i].OnOff = fx["active"];
+        retPreset.preset_num = 0;
+        retPreset.curr_preset = 0;
+      }   
+    }
+  }
 }
 
 // save preset to json file in the format used by PG cloud back-up

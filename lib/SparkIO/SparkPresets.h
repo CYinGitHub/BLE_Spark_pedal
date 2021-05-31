@@ -258,7 +258,7 @@ const char spark_reverbs[][STR_LEN+1]{"bias.reverb"};
 const char spark_knobs[7][5][11] {
   {"","","","",""}, //noise gate
   {"","","","",""}, //compressor
-  {"","","","",""}, //drive
+  {"DRIVE","","","",""}, //drive
   {"GAIN","TREBLE","MID","BASS","MASTER"}, //amp
   {"MODULATION","","","",""}, //modulation
   {"DELAY","","","","BPM"}, //delay
@@ -273,7 +273,8 @@ const s_fx_coords knobs_order[] = {
   {3,4},
   {4,0},
   {5,0},
-  {6,0}
+  {6,0},
+  {2,0}
 };
 
-const uint8_t knobs_number = 8;
+const uint8_t knobs_number = 9;

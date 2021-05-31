@@ -6,19 +6,21 @@
 As it now uses BLE it's possible to connect both mobile app and this pedal to Spark Amp. To do this you should first connect the pedal, and then launch the app, skipping the connect option. After that manually connect "Spark 40 Audio" to your mobile/tablet. Done, you can use audio/video options of the app, and all you have in the pedal. Note, that Tonecloud and preset editing from the app ain't available in this mode.
 
 What it can for the time being:
-
+*   ALL MODES
+    *   The first rotary encoder is changing FX parameters like amp's knobs do (plus drive). Pushing encoder selects next FX. During this operation the second encoder changes to prev/next FX knobs
 *   "EFFECTS" mode: on-off individual effecs in a chain
-    *   The first rotary encoder is changing FX parameters like amp's knobs do. A push selects next FX. During this operation the second encoder changes to prev/next FX knobs. 
-    *   The second encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet. Pushing it envokes not-implemented-yet PRESETS mode )
+    *   The second encoder changes presets: first four is hardware (in-amp), the other 24 are hardcoded yet. Pushing it envokes not-implemented-yet SCENES mode )
     *   The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
     *   Long pressing the first button invokes amp info screen
     *   Long pressing the second button: bypassing all the 7 effects, and then any button returns the amp to the previous state
 
-*   "PRESETS" mode: switching between four configured presets as fast as Spark can. Switch between such configurations.
-    *   In progress
+*   "SCENES" mode: switching between four configured presets as fast as Spark can. Switch between such configurations.
+    *   First scene in the list is HW. This is an equivalent to amp's 4 channel buttons
+    *   Each other scene contains 4 presets on user's choice
+    *   Long pressing one of the four buttons saves current settings as a preset to the appropriate slot of the current scene 
 
 *   "SETTINGS" mode: some parameters stored in flash
-    *   Not implemented   
+    *   Not implemented yet
 
 It's gonna be a standalone BLE footswitch for Spark amp to use in "gig mode", ie to switch between tones (4 stored within the amp, and a reasonable number, say 20, 50 or 100 of presets stored in on-board flash), or just turn On/Off effects inside a tone with just one tap.
 
@@ -26,8 +28,7 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 
 ## ToDo
 
-*   Storing presets in ESP's filesystem (partially done)
-*   Implement "PRESETS" mode (merged with SCENES, in progress)
+*   Storing presets in ESP's filesystem (DONE)
 *   "SCENES" mode. Switching between 4-preset combinations (In progress).
 *   Implement "ORGANIZE" mode (not gonna be here)
 *   Implement "SETTINGS" mode

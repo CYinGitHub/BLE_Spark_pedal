@@ -723,7 +723,7 @@ void SparkIO::get_preset_details(unsigned int preset)
 }
 
 
-void SparkIO::greeting()
+void SparkIO::hello()
 {
   expectedSubcmd = 0x0000;
   start_message (0x0224);

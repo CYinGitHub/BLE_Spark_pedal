@@ -55,7 +55,7 @@ class SparkIO
     void get_name();
     void get_hardware_preset_number();
     void get_preset_details(unsigned int preset);
-    void greeting() ; //strange message, yet we mimic it
+    void hello() ; //strange message, yet we mimic it
     
     // sending data
 

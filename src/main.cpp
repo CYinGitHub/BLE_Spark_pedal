@@ -69,8 +69,9 @@ savePresetToFile()
 #define BUTTON2_PIN 26
 #define BUTTON3_PIN 27
 #define BUTTON4_PIN 14
-#define BT_ATTEMPTS_BEFORE_OFF 300
-#define HW_PRESETS 4  // 4 hardware presets in amp
+#define BT_SEARCHES_BEFORE_OFF 300
+#define BT_CONNECTS_BEFORE_OFF 10
+#define HW_PRESETS 5  // 4 hardware presets + 1 temporary in amp presets
 #define HARD_PRESETS 24  // number of hard-coded presets in SparkPresets.h
 #define FLASH_PRESETS 50  // number of presets stored in on-board flash
 #define TOTAL_PRESETS HW_PRESETS + FLASH_PRESETS
@@ -92,7 +93,7 @@ const char* DEVICE_NAME = "Pedal for Spark";
 const char* VERSION = "0.8BLE";
 const uint8_t MAX_LEVEL = 100; // maximum level of effect, actual value in UI is level divided by 100
 bool btConnected = false;
-int scroller=0, scrollStep = -2; // speed of scrolling tone names
+int scroller=0, scrollStep = -2; // speed of horiz scrolling tone names
 int vScroller=0;
 ulong scrollCounter;
 ulong idleCounter; // for pending tone change 
@@ -104,13 +105,14 @@ unsigned int waitSubcmd=0x0000;
 bool tempUI = false;
 int p, j, curKnob=0, curFx=3, curParam=4, level = 0;
 String ampName="", serialNum="", firmwareVer="" ; //sorry for the Strings, I hope this won't crash the pedal =)
-String btCaption, fxCaption="MASTER";
+String btCaption;
+String fxCaption=spark_knobs[curFx][curParam];
 String infoCaption, infoText;
 volatile ulong safeRecursion=0;
-int pendingPresetNum = -1 ;
-int localPresetNum; 
+int pendingPresetNum = -2 ; // -1 when booting and amp is at 07f
+int localPresetNum = 0; 
 int pendingSceneNum = -2; // -1 is for 4 HW presets
-int localSceneNum;
+int localSceneNum = -1;
 uint8_t remotePresetNum;
 bool fxState[] = {false,false,false,false,false,false,false}; // array to store FX's on/off state before total bypass is ON
 bool bypass=false;
@@ -390,7 +392,7 @@ int overlaysCount = 1;
 void setup() { 
   Serial.begin(115200);
   DEBUG(F("Serial started")); 
-  localPresetNum = 1;
+
   btAttempts = 0;
   ui.setTargetFPS(30);
   ui.disableAllIndicators();
@@ -444,13 +446,10 @@ void setup() {
 // LOOP() WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW 
 void loop() {
 safeRecursion++;
-if (safeRecursion>2) {
-  safeRecursion--;
-  return;
-}
 // Check BT Connection and (RE-)connect if needed
 btConnected = spark_comms.connected();
   if (!btConnected) {
+    spark_io.comms->doConnect = false;
     btConnect();
     DEBUG(">>> start building catalog");
     buildPresetList();
@@ -466,11 +465,17 @@ btConnected = spark_comms.connected();
       if (cmdsub == 0x0301) { //get preset info
         p = preset.preset_num;
         j = preset.curr_preset;
+        Serial.print("was ");
+        Serial.print( p );
         if (p == TMP_PRESET_ADDR)       
           p = TMP_PRESET;
         if (j == 0x01) {
           p = CUR_EDITING;
         }
+        Serial.print(" now ");
+        Serial.print( p );
+        Serial.print(" " );
+        Serial.println( preset.Name);
         presets[p] = preset;
         updateFxStatuses();
         //dump_preset(preset);
@@ -538,7 +543,7 @@ btConnected = spark_comms.connected();
           waitForResponse(spark_io.expectedSubcmd,1000);
           presets[CUR_EDITING] = presets[remotePresetNum];
         }
-        if (remotePresetNum == 0x7f) { 
+        if (remotePresetNum == TMP_PRESET_ADDR) { 
 
         }
         DEBUG("Store in preset: " + remotePresetNum);
@@ -552,11 +557,11 @@ btConnected = spark_comms.connected();
       if (cmdsub == 0x0310) {
         remotePresetNum = msg.param2;
         j = msg.param1;
-        if (remotePresetNum == 0x7f) 
+        if (remotePresetNum == TMP_PRESET_ADDR) 
           remotePresetNum = TMP_PRESET;
         if (j == 0x01) 
           remotePresetNum = CUR_EDITING;
-        localPresetNum = remotePresetNum;
+        if (localPresetNum!=-1) localPresetNum = remotePresetNum;
         presets[CUR_EDITING] = presets[remotePresetNum];
         updateFxStatuses();
         DEBUG("Hadware preset is: " + remotePresetNum);
@@ -611,6 +616,10 @@ btConnected = spark_comms.connected();
     returnToMainUI();
   }
   
+  if (safeRecursion>1) {
+    safeRecursion--;
+    return;
+  }
   safeRecursion--;
 }
 
@@ -679,7 +688,7 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
     switch (eventType) {
       case ace_button::AceButton::kEventClicked:
         if (localSceneNum==-1) {
-          if (id<HW_PRESETS){
+          if (id<PEDALS_NUM){
             spark_io.change_hardware_preset(id);
             localPresetNum = id;
             remotePresetNum = id;
@@ -710,9 +719,15 @@ void btConnect() {
   // Loop until device establishes connection with amp
   while (!btConnected) {
     ui.switchToFrame(MODE_CONNECT);
-    btCaption = "CONNECTING..";
-    btAttempts++;
-    if (btAttempts>BT_ATTEMPTS_BEFORE_OFF) ESP_off();
+    if (spark_io.comms->doConnect) {
+      btAttempts++;
+      btCaption = "CONNECTING..";
+      if (btAttempts>BT_CONNECTS_BEFORE_OFF) ESP_off();
+    } else {
+      btAttempts++;
+      btCaption = "SEARCHING..";
+      if (btAttempts>BT_SEARCHES_BEFORE_OFF) ESP_off();
+    }
     delay(50); 
     ui.update(); 
     DEBUG("Connecting... >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
@@ -721,7 +736,7 @@ void btConnect() {
       DEBUG("BT Connected"); 
       btAttempts = 0;     
       btCaption = "RETRIEVING..";
-      greetings();
+      while (!greetings() && btConnected) {} // we should be sure that comms are ok
       mode = MODE_EFFECTS;
       tempFrame(MODE_ABOUT, mode, 3000);
     } else {
@@ -782,6 +797,10 @@ void dump_preset(SparkPreset preset) {
 
 //returns true if response received in timely fashion, otherwise returns false (timed out) 
 bool waitForResponse(unsigned int subcmd=0, ulong msTimeout=1000) {
+  if (!btConnected) {
+    DEBUG("not connected -- nothing to wait for");
+    return false;
+  }
   DEBUG("Wait for response " + String(subcmd, HEX) + " " + msTimeout + "ms");
   waitSubcmd = subcmd;
   if (subcmd==0x0000) { 
@@ -812,60 +831,68 @@ void updateFxStatuses() {
 }
 
 bool greetings() {
-  int maxRetries = 3; 
+  int maxRetries = 5; 
   int retryN = maxRetries ;
   do {
     spark_io.get_name();
     retryN--; 
-  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+  } while (!waitForResponse(spark_io.expectedSubcmd,2000) && retryN>0);
   if (retryN <=0) return false;
+  spark_io.hello(); // no response
   retryN = maxRetries ;
   do {
-  spark_io.greeting(); // no response
-  spark_io.get_serial(); 
-  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+    spark_io.get_serial(); 
+    retryN--; 
+  } while (!waitForResponse(spark_io.expectedSubcmd,2000) && retryN>0);
   if (retryN <=0) return false;
   retryN = maxRetries ;
   do {
     spark_io.get_preset_details(0x0000); 
-  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+    retryN--; 
+  } while (!waitForResponse(spark_io.expectedSubcmd,2000) && retryN>0);
   if (retryN <=0) return false;
   retryN = maxRetries ;
   do {  
     spark_io.get_preset_details(0x0001); 
-  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+    retryN--; 
+  } while (!waitForResponse(spark_io.expectedSubcmd,2000) && retryN>0);
   if (retryN <=0) return false;
   retryN = maxRetries ;
   do {
     spark_io.get_preset_details(0x0002); 
-  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+    retryN--; 
+  } while (!waitForResponse(spark_io.expectedSubcmd,2000) && retryN>0);
   if (retryN <=0) return false;
   retryN = maxRetries ;
   do {
     spark_io.get_preset_details(0x0003); 
-  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+    retryN--; 
+  } while (!waitForResponse(spark_io.expectedSubcmd,2000) && retryN>0);
   if (retryN <=0) return false;
   retryN = maxRetries ;
   do {
     spark_io.get_hardware_preset_number(); 
-  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+    retryN--; 
+  } while (!waitForResponse(spark_io.expectedSubcmd,2000) && retryN>0);
   if (retryN <=0) return false;
   retryN = maxRetries ;
   do {
     spark_io.get_firmware_ver(); 
-  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+    retryN--; 
+  } while (!waitForResponse(spark_io.expectedSubcmd,2000) && retryN>0);
   if (retryN <=0) return false;
   retryN = maxRetries ;
   do {
     spark_io.get_preset_details(0x0100); 
-  } while (!waitForResponse(spark_io.expectedSubcmd,1000) && retryN>0);
+    retryN--; 
+  } while (!waitForResponse(spark_io.expectedSubcmd,2000) && retryN>0);
   if (retryN <=0) return false; else return true;
 }
 
 char* localPresetName(int localNum) {
   if (localNum > TOTAL_PRESETS-1) { localNum = localNum - (TOTAL_PRESETS) ;}
   if (localNum < 0) {localNum = localNum + TOTAL_PRESETS ;}
-  if (localNum<HW_PRESETS) {
+  if (localNum < HW_PRESETS) {
     return presets[localNum].Name;
   } else {
     return flashPresets[localNum-HW_PRESETS].Name;
@@ -986,7 +1013,7 @@ void uploadPreset(int presetNum) {
     spark_io.change_hardware_preset(TMP_PRESET_ADDR);
   }
   updateFxStatuses();
-  pendingPresetNum = -1;
+  pendingPresetNum = -2;
 }
 
 void loadPresets(int scnNum) {
@@ -997,6 +1024,7 @@ void loadPresets(int scnNum) {
   }
   localSceneNum = scnNum;
   pendingSceneNum = -2;
+  DEBUG("Changed scene to " + String(localSceneNum));
 }
 
 void toggleBypass() {

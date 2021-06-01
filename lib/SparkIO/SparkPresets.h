@@ -254,7 +254,7 @@ const char spark_delays[][STR_LEN+1]{"DelayMono", "DelayEchoFilt", "VintageDelay
               "DelayMultiHead", "DelayRe201"};
 const char spark_reverbs[][STR_LEN+1]{"bias.reverb"};  
 
-
+// knob, fx, param
 const char spark_knobs[7][5][11] {
   {"","","","",""}, //noise gate
   {"","","","",""}, //compressor

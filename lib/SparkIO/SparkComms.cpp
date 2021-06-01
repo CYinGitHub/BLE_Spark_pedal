@@ -68,7 +68,7 @@ void SparkComms::notifyCB(NimBLERemoteCharacteristic* pRemoteCharacteristic, uin
         Serial.print(rcv_buffer[i], HEX);
     }
 */
-    delay(5); //breath (I DON'T KNOW WHY, BUT THIS IMPROVES STABILITY. )
+    delay(10); //breath (I DON'T KNOW WHY, BUT THIS IMPROVES STABILITY. )
     rcv_pos = 0; //later maybe use queue
 }
 
@@ -81,8 +81,7 @@ void SparkComms::scanEndedCB(NimBLEScanResults results){
 
 
 bool SparkComms::connect_to_spark() {
-        if (doConnect) {
-
+    if (doConnect) {
         if(NimBLEDevice::getClientListSize()) {
             pClient = NimBLEDevice::getClientByPeerAddress(advDevice->getAddress());
             if(pClient){
@@ -180,14 +179,14 @@ void SparkComms::ClientCallbacks::onConnect(NimBLEClient* pClient) {
     DEBUG("Connected");
 
  //   pClient->updateConnParams(120,120,0,60);
-//    pClient->updateConnParams(36,36,0,60);
+    pClient->updateConnParams(36,36,0,60);
 };
 
 void SparkComms::ClientCallbacks::onDisconnect(NimBLEClient* pClient) {
     _btConnected = false;
     DEBUG(pClient->getPeerAddress().toString().c_str());
     DEBUG(" Disconnected - Starting scan");
-    //    NimBLEDevice::getScan()->start(scanTime, scanEndedCB);
+    NimBLEDevice::getScan()->start(scanTime, scanEndedCB);
 };
 
 bool SparkComms::ClientCallbacks::onConnParamsUpdateRequest(NimBLEClient* pClient, const ble_gap_upd_params* params) {

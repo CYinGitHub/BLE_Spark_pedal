@@ -6,16 +6,16 @@
 As it now uses BLE it's possible to connect both mobile app and this pedal to Spark Amp. To do this you should first connect the pedal, and then launch the app, skipping the connect option. After that manually connect "Spark 40 Audio" to your mobile/tablet. Done, you can use audio/video options of the app, and all you have in the pedal. Note, that Tonecloud and preset editing from the app ain't available in this mode.
 
 What it can for the time being:
-*   ALL MODES
+*   IN ALL MODES
     *   The first rotary encoder is changing FX parameters like amp's knobs do (plus drive). Pushing encoder selects next FX. During this operation the second encoder changes to prev/next FX knobs
     *   Pushing the second encoder cycle modes
-*   "EFFECTS" mode: on-off individual effecs in a chain
-    *   The second encoder changes presets: first four is hardware (in-amp), the rest are stored in flash. Pushing this encoder invokes not-implemented-yet SCENES mode )
+*   IN "EFFECTS" mode: on-off individual effecs in a chain
+    *   The second encoder changes presets: first four is hardware (in-amp), the rest are stored in flash. Pushing this encoder invokes SCENES mode )
     *   The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
     *   Long pressing the first button invokes amp info screen
     *   Long pressing the second button: bypassing all the 7 effects, and then any button returns the amp to the previous state
 
-*   "SCENES" mode: switching between four configured presets as fast as Spark can. Switch between such configurations.
+*   IN "SCENES" mode: switching between four configured presets as fast as Spark can. Switch between such configurations.
     *   First scene in the list is HW. This is an equivalent to amp's 4 channel buttons
     *   Each other scene contains 4 presets on user's choice
     *   Long pressing one of the four buttons saves current settings as a preset to the appropriate slot of the current scene 

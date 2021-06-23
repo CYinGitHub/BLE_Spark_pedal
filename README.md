@@ -9,6 +9,8 @@ What it can for the time being:
 *   IN ALL MODES
     *   The first rotary encoder is changing FX parameters like amp's knobs do (plus drive). Pushing encoder selects next FX. During this operation the second encoder changes to prev/next FX knobs
     *   Pushing the second encoder cycle modes
+    *   Long pushing the second encoder involves deep-sleep (pushing wakes again)
+
 *   IN "EFFECTS" mode: on-off individual effecs in a chain
     *   The second encoder changes presets: first four is hardware (in-amp), the rest are stored in flash. Pushing this encoder invokes SCENES mode )
     *   The four buttons switches FX on and off (DRV, MOD, DLY, RVB) or at your choice
@@ -39,6 +41,10 @@ These presets will probably be accessible via the on-board web server thru WiFi 
 *   Attaching addressable RGB LEDs.
 *   Change to BLE (done, debugging).
 *   Battery power supply and maybe battery management (In progress, probably will only work with Heltec).
+
+## Your tone presets collection
+*   There's a /data folder in the project, and for now you can populate it with subfolders like 1, 2, 3, 4, 5, etc, each containing a json file from the backup of your tones from the original PG app.
+*   Don't forget to bild and upload a filesystem image as explained further!
 
 ## Software HowTo
 

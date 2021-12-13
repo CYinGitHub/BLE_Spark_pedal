@@ -4,7 +4,7 @@
 [![](https://www.travis-ci.com/copych/BLE_Spark_pedal.svg?branch=withBLE)](https://www.travis-ci.com/github/copych/BLE_Spark_pedal)
 
 
-This is my version of copych's BLE_Spark_pedal. I don't know coding, just modified some functions and convert it into 4-buttons Pedal:
+This is my version of copych's BLE_Spark_pedal. I don't know coding, just copy-and-paste to modified some functions to convert it into 4-buttons Pedal:
 
    Common Function:
 
@@ -54,11 +54,11 @@ Software Bank Mode (Preset 6-59)
 
         Double Click Button:
 
-         1: Preset Up X10 and round down to *0. if current preset is X9, it effect as X20 and round down. (no point double clicking if you are at X9)
+         1: Preset Up +10 and round down to *0. if current preset is X9, it effect as +20 and round down. (no point double clicking if you are at X9)
             e.g., 22 -> 30; 29-> 40
 
-         2: Preset Down X10 and round down to *0. if current preset is X9, it round down to X1 instead of X0-10.
-            e.g., 22 -> 10; 29 -> 21; 21 -> 10 
+         2: Preset Down +10 and round down to *0. if current preset is X8/X9, it round down to X1 instead of X0-10.
+            e.g., 22 -> 10; 28 -> 21
 
          3: switch click button 3 behavior
 
@@ -87,11 +87,11 @@ Pedal Mode
 
          2: Preset Down
 
-         3: Preset Up X10 and round down to *0. if current preset is X9, it effect as X20 and round down. (no point double clicking if you are at X9)
+         3: Preset Up +10 and round down to *0. if current preset is X9, it effect as +20 and round down. (no point double clicking if you are at X9)
             e.g., 22 -> 30; 29-> 40
 
-         4: Preset Down X10 and round down to *0. if current preset is X9, it round down to X1 instead of X0-10.
-            e.g., 22 -> 10; 29 -> 21; 21 -> 10
+         4: Preset Down +10 and round down to *0. if current preset is X8/X9, it round down to X1 instead of X0-10.
+            e.g., 22 -> 10; 28 -> 21
 
 
 

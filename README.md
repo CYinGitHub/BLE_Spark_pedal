@@ -6,6 +6,9 @@
 
 This is my version of copych's BLE_Spark_pedal. I don't know coding, just copy-and-paste to modified some functions to convert it into 4-buttons Pedal:
 
+I modified the main.cpp and fonts.h
+
+
    Common Function:
 
       Long Press Button:

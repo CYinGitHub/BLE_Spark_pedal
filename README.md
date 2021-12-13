@@ -6,92 +6,92 @@
 
 This is my version of copych's BLE_Spark_pedal. I don't know coding, just modified some functions and convert it into 4-buttons Pedal:
 
-Common Function:
+   Common Function:
 
-   Long Press Button:
-   
-      1: Hardware Mode
-      
-      2: Software Bank Mode
-      
-      3: Pedal Mode
-      
-      4: Sleep
+      Long Press Button:
+
+         1: Hardware Mode
+
+         2: Software Bank Mode
+
+         3: Pedal Mode
+
+         4: Sleep
 
 
 Hardware Mode (Preset 1-4)
 
-   Long Press Button:
-   
-      1: Bypass
-      
-    Click Button:
-    
-      1: HW preset 1
-      
-      2: HW preset 2
-      
-      3: HW preset 3
-      
-      4: HW preset 4
+      Long Press Button:
+
+         1: Bypass
+
+       Click Button:
+
+         1: HW preset 1
+
+         2: HW preset 2
+
+         3: HW preset 3
+
+         4: HW preset 4
       
 
 Software Bank Mode (Preset 6-59)
 
-   Long Press Button:
-   
-      2: Bypass
-      
-    Click Button:
-    
-      1: Preset Up
-      
-      2: Preset Down
-      
-      3: Toggle Drive(default)/Modulation
-      
-      4: Toggle Delay(default)/Reverb
-      
-     Double Click Button:
-     
-      1: Preset Up X10 and round down to *0. if current preset is X9, it effect as X20 and round down. (no point double clicking if you are at X9)
-         e.g., 22 -> 30; 29-> 40
-         
-      2: Preset Down X10 and round down to *0. if current preset is X9, it round down to X1 instead of X0-10.
-         e.g., 22 -> 10; 29 -> 21; 21 -> 10 
-         
-      3: switch click button 3 behavior
-      
-      4: switch click button 4 behavior
+      Long Press Button:
+
+         2: Bypass
+
+       Click Button:
+
+         1: Preset Up
+
+         2: Preset Down
+
+         3: Toggle Drive(default)/Modulation
+
+         4: Toggle Delay(default)/Reverb
+
+        Double Click Button:
+
+         1: Preset Up X10 and round down to *0. if current preset is X9, it effect as X20 and round down. (no point double clicking if you are at X9)
+            e.g., 22 -> 30; 29-> 40
+
+         2: Preset Down X10 and round down to *0. if current preset is X9, it round down to X1 instead of X0-10.
+            e.g., 22 -> 10; 29 -> 21; 21 -> 10 
+
+         3: switch click button 3 behavior
+
+         4: switch click button 4 behavior
       
 
 Pedal Mode
 
-   Long Press Button:
-   
-      3: Bypass
-      
-    Click Button:
-    
-      1: Toggle Drive
-      
-      2: Toggle Modulation
-      
-      3: Toggle Delay
-      
-      4: Toggle Reverb
-      
-    Double Click Button:
-    
-      1: Preset Up
-      
-      2: Preset Down
-      
-      3: Preset Up X10 and round down to *0. if current preset is X9, it effect as X20 and round down. (no point double clicking if you are at X9)
-         e.g., 22 -> 30; 29-> 40
-         
-      4: Preset Down X10 and round down to *0. if current preset is X9, it round down to X1 instead of X0-10.
-         e.g., 22 -> 10; 29 -> 21; 21 -> 10
+      Long Press Button:
+
+         3: Bypass
+
+       Click Button:
+
+         1: Toggle Drive
+
+         2: Toggle Modulation
+
+         3: Toggle Delay
+
+         4: Toggle Reverb
+
+       Double Click Button:
+
+         1: Preset Up
+
+         2: Preset Down
+
+         3: Preset Up X10 and round down to *0. if current preset is X9, it effect as X20 and round down. (no point double clicking if you are at X9)
+            e.g., 22 -> 30; 29-> 40
+
+         4: Preset Down X10 and round down to *0. if current preset is X9, it round down to X1 instead of X0-10.
+            e.g., 22 -> 10; 29 -> 21; 21 -> 10
 
 
 

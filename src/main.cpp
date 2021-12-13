@@ -1291,12 +1291,12 @@ void switchPresets(int x) {
   if (x == 0) {
     localPresetNum--;
     if (localPresetNum<0) localPresetNum=TOTAL_PRESETS-1;
-    if (localPresetNum==6) localPresetNum--;
+    if (localPresetNum==4) localPresetNum--;
   }
   if (x == 1) {
     localPresetNum++;
     if (localPresetNum>TOTAL_PRESETS-1) localPresetNum = 0;
-    if (localPresetNum==6) localPresetNum++;
+    if (localPresetNum==4) localPresetNum++;
   }
   if (localPresetNum < HW_PRESETS ) {
     remotePresetNum = localPresetNum;

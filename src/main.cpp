@@ -21,11 +21,11 @@ Initial hardware build included:
   - buttons : 4 pcs
   - pushable rotary encoders : 2pcs
   - SSD1306 duo-color OLED display : 1pcs
- 
+
 presets[]
- 0,1,2,3 : slots 0x000-0x0003 hardware presets, associated with the amp's buttons
- 4 : slot 0x007f used by the app (and this program) to hold temporary preset
- 5 : slot 0x01XX (current state) - current preset + all the unsaved editing on the amp
+  0,1,2,3 : slots 0x000-0x0003 hardware presets, associated with the amp's buttons
+  4 : slot 0x007f used by the app (and this program) to hold temporary preset
+  5 : slot 0x01XX (current state) - current preset + all the unsaved editing on the amp
 
 You may (or may not) find usefull a couple of methods which works with PG json files:
 loadPresetFromFile()
@@ -59,21 +59,21 @@ savePresetToFile()
 #define DISPLAY_SCL 22
 #define DISPLAY_SDA 23
 #endif
-#define ENCODER1_CLK 5 // note that GPIO5 is HardwareSerial(2) RX, don't use them together
-#define ENCODER1_DT 18 // note that GPIO18 is HardwareSerial(2) TX, don't use them together
-#define ENCODER1_SW 19
-#define ENCODER2_CLK 17
-#define ENCODER2_DT 16
-#define ENCODER2_SW 4 // (on/off) Only GPIOs which have RTC functionality can be used: 0,2,4,12-15,25-27,32-39 
-#define BUTTON1_PIN 25
-#define BUTTON2_PIN 26
-#define BUTTON3_PIN 27
-#define BUTTON4_PIN 14
+#define ENCODER1_CLK 13 // note that GPIO5 is HardwareSerial(2) RX, don't use them together
+#define ENCODER1_DT 12 // note that GPIO18 is HardwareSerial(2) TX, don't use them together
+#define ENCODER1_SW 14
+#define ENCODER2_CLK 32
+#define ENCODER2_DT 35
+#define ENCODER2_SW 34 // (on/off) Only GPIOs which have RTC functionality can be used: 0,2,4,12-15,25-27,32-39 
+#define BUTTON1_PIN 5
+#define BUTTON2_PIN 4
+#define BUTTON3_PIN 18
+#define BUTTON4_PIN 19
 #define BT_SEARCHES_BEFORE_OFF 300
 #define BT_CONNECTS_BEFORE_OFF 10
 #define HW_PRESETS 5  // 4 hardware presets + 1 temporary in amp presets
 #define HARD_PRESETS 24  // number of hard-coded presets in SparkPresets.h
-#define FLASH_PRESETS 50  // number of presets stored in on-board flash
+#define FLASH_PRESETS 54  // number of presets stored in on-board flash
 #define TOTAL_PRESETS HW_PRESETS + FLASH_PRESETS
 #define TOTAL_SCENES 10 // number of 4-efx combinations to store
 #define TRANSITION_TIME 200 //(ms) ui slide effect timing
@@ -81,7 +81,9 @@ savePresetToFile()
 #define SMALL_FONT ArialMT_Plain_10
 #define MID_FONT ArialMT_Plain_16
 #define BIG_FONT ArialMT_Plain_24
+#define XL_FONT Roboto_Mono_Medium_48
 #define HUGE_FONT Roboto_Mono_Medium_52
+
 
 // a lot of globals, I know it's not that much elegant 
 enum e_amp_presets {HW_PRESET_0,HW_PRESET_1,HW_PRESET_2,HW_PRESET_3,TMP_PRESET,CUR_EDITING,TMP_PRESET_ADDR=0x007f};
@@ -90,7 +92,7 @@ enum e_mode {MODE_CONNECT, MODE_EFFECTS, MODE_SCENES, MODE_INFO, MODE_SETTINGS, 
 e_mode mode = MODE_CONNECT;
 e_mode returnFrame = MODE_EFFECTS;  // we should memorize where to return
 const char* DEVICE_NAME = "Pedal for Spark";
-const char* VERSION = "0.8BLE";
+const char* VERSION = "CYin.Mod";
 const uint8_t MAX_LEVEL = 100; // maximum level of effect, actual value in UI is level divided by 100
 bool btConnected = false;
 int scroller=0, scrollStep = -2; // speed of horiz scrolling tone names
@@ -140,6 +142,7 @@ s_fx_coords fxNumByName(const char* fxName);
 void toggleBypass();
 void toggleEffect(int slotNum);
 void cycleMode();
+void selectMode(int x);
 bool createFolders();
 void textAnimation(const String &s, ulong msDelay, int yShift, bool show);
 void ESP_off();
@@ -148,6 +151,10 @@ void buildPresetList();
 void updatePresetList(uint8_t numPreset);
 char* localPresetName(int localNum);
 void handlePresets(int x);
+void switchPresets(int x);
+void switchPresetsX10(int x);
+void switchPresetsSetting(int x);
+void switchPresetsX10Setting(int x);
 void handleScenes(int x);
 SparkPreset loadPresetFromFile(int slot);
 bool savePresetToFile(SparkPreset savedPreset, const String &filePath);
@@ -170,6 +177,10 @@ ulong last_millis;
 int my_state;
 int scr_line;
 char str[50];
+
+// CUSTOM Init ==============================================================================
+bool Button3_State = false;
+bool Button4_State = false;
 
 // BUTTONS Init ==============================================================================
 typedef struct {
@@ -210,7 +221,7 @@ MD_REncoder Encoder2 = MD_REncoder(ENCODER2_DT, ENCODER2_CLK);
   SSD1306Wire  display(0x3c, DISPLAY_SDA , DISPLAY_SCL); //in my case GPIO's are SDA=21 , SCL=22 , addr is 0x3c 
 #endif
 #ifdef SH1106WIRE
-  SH1106Wire display(0x3c, DISPLAY_SDA, DISPLAY_SCL);
+  SH1106Wire display(0x3C, DISPLAY_SDA, DISPLAY_SCL);
 #endif
 OLEDDisplayUi ui( &display );
 
@@ -238,35 +249,15 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
     int boxWidth = display->getStringWidth("WWW");
     int pxPerLabel = (display->width() - 8) / PEDALS_NUM;
     boxWidth = max(boxWidth,pxPerLabel-2);
-    if (localPresetNum<HW_PRESETS) {
-      display->drawRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
-      display->drawString(boxWidth/2 + x,y + 16 ,"HW");
-    }
+    display->drawRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
+    display->drawString(x + (boxWidth/2),y + 16 ,"FX");
     if (pendingPresetNum < 0) {
+      display->setTextAlignment(TEXT_ALIGN_RIGHT);
+      display->setFont(XL_FONT);
+      display->drawString( x + boxWidth*2 , 20 + y, String(localPresetNum + 1) ); // +1 for humans
       display->setTextAlignment(TEXT_ALIGN_LEFT);
-      display->setFont(HUGE_FONT);
-      int s1w = display->getStringWidth(String(localPresetNum + 1))+5;
-      display->setFont(BIG_FONT);
-      int s2w = display->getStringWidth(presets[CUR_EDITING].Name)+5;
-      if (s1w+s2w <= display->width()) {
-        scroller = ( display->width() - s1w - s2w ) / 2;
-      } else {
-        if ( millis() > scrollCounter ) {
-          scroller = scroller + scrollStep;
-          if (scroller < (int)(display->width())-s1w-s2w-s1w-s2w) {
-            scroller = scroller + s1w + s2w;
-          }
-          scrollCounter = millis() + 20;
-        }
-        display->setFont(HUGE_FONT);
-        display->drawString( x + scroller + s1w + s2w, 11 + y, String(localPresetNum + 1) ); // +1 for humans
-        display->setFont(BIG_FONT);
-        display->drawString(x + scroller + s1w + s2w + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
-      }
-      display->setFont(HUGE_FONT);
-      display->drawString( x + scroller, 11 + y, String(localPresetNum + 1) ); // +1 for humans
-      display->setFont(BIG_FONT);
-      display->drawString(x + scroller + s1w, y + display->height()/2 - 6 ,presets[CUR_EDITING].Name);
+      display->setFont(MID_FONT);
+      display->drawStringMaxWidth(x + ((pxPerLabel-boxWidth)/2) + boxWidth*2, y + 16, 130 - boxWidth*2,presets[CUR_EDITING].Name);
     } else {
       if (vScroller !=0) {
       if ( millis() > scrollCounter ) {
@@ -306,27 +297,58 @@ void frameEffects(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
 }
 
 void frameScenes(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-  display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->setFont(SMALL_FONT);
-  int pxPerLabel = (display->width() - 8) / PEDALS_NUM;
-  int boxWidth = display->getStringWidth("WWW");
-  boxWidth = max(boxWidth,pxPerLabel-2);
-  for (int i=0 ; i<PEDALS_NUM; i++) {
-    if (i==localPresetNum) {
-      display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
+  if(bypass){
+    display->setFont(BIG_FONT);
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    display->drawString(display->width()/2 + x, 20 + y, "BYPASS" );
+  } else {
+    int boxWidth = display->getStringWidth("WWW");
+    int pxPerLabel = (display->width() - 8) / PEDALS_NUM;
+    boxWidth = max(boxWidth,pxPerLabel-2);
+    if (localPresetNum<HW_PRESETS) {
+      display->fillRect(x+(3*pxPerLabel+(pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
+      display->drawString(x+((3+0.5)*pxPerLabel),y + 16 ,"HW");
+    }
+    display->fillRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth*1.5,14);
+    display->drawString(x + (boxWidth*1.5/2),y + 16 ,"BANK");
+    if (pendingPresetNum < 0) {
+      display->setTextAlignment(TEXT_ALIGN_CENTER);
+      display->setFont(HUGE_FONT);
+      display->drawString((display->width())/2 + x, 11 + y, String(localPresetNum + 1) ); // +1 for humans
     } else {
-      display->drawRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
-    } 
-    display->drawString(x+((i+0.5)*pxPerLabel), y, String(i+1));
-  }
-  if (showScene) {
-    display->drawRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth,14);
-    display->drawString(boxWidth/2 + x,y + 16 ,"SCN");
-    display->setFont(HUGE_FONT);
-    if (localSceneNum>-1) {
-      display->drawString((display->width())/2 + x, 11 + y, String(localSceneNum+1) );
-    } else {
-      display->drawString((display->width())/2 + x, 11 + y, "HW" );
+      if (vScroller !=0) {
+      if ( millis() > scrollCounter ) {
+          vScroller = vScroller - 2*((vScroller > 0) - (vScroller < 0));
+          scrollCounter = millis() + 15;
+        }
+      }
+      display->setTextAlignment(TEXT_ALIGN_RIGHT);
+      display->setFont(BIG_FONT);
+      int offsetX = display->getStringWidth("00");
+      display->drawString(offsetX + x, 27 + y, String(localPresetNum+1) );
+      display->setTextAlignment(TEXT_ALIGN_LEFT);
+      display->setFont(SMALL_FONT);
+      display->drawString(offsetX + x+6, 10 + y + vScroller, localPresetName(localPresetNum-2) );
+      display->drawString(offsetX + x+6, 20 + y + vScroller, localPresetName(localPresetNum-1) );
+      display->drawString(offsetX + x+6, 45 + y + vScroller, localPresetName(localPresetNum+1) );
+      display->drawString(offsetX + x+6, 55 + y + vScroller, localPresetName(localPresetNum+2) );
+      display->setColor(BLACK);
+      display->fillRect(x+offsetX, y+31, display->width()-offsetX, 17);
+      display->setFont(MID_FONT);
+      display->setColor(INVERSE);
+      offsetX = offsetX + 4;
+      display->drawString(offsetX + x-1, 29 + y , localPresetName(localPresetNum) );
+    }
+    display->setColor(BLACK);
+    display->fillRect(x+0, y+0, display->width()-8, 16);
+    display->setFont(SMALL_FONT);
+    display->setColor(INVERSE);
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    for (int i=0 ; i<PEDALS_NUM; i++) {
+      if (BUTTONS[i].fxState) {
+        display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
+      }
+      display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].fxLabel));
     }
   }
 }
@@ -342,10 +364,78 @@ void frameInfo(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16
 }
 
 void frameSettings(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-  //
-  display->setFont(HUGE_FONT);
-  display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString((display->width())/2 + x, 11 + y, "SET" );
+  if(bypass){
+    display->setFont(BIG_FONT);
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    display->drawString(display->width()/2 + x, 20 + y, "BYPASS" );
+  } else {
+    int boxWidth = display->getStringWidth("WWW");
+    int pxPerLabel = (display->width() - 8) / PEDALS_NUM;
+    boxWidth = max(boxWidth,pxPerLabel-2);
+    display->fillRect(x+((pxPerLabel-boxWidth)/2),y + 16,boxWidth*1.7,14);
+    display->drawString(x + (boxWidth*1.7/2),y + 16 ,"CUSTOM");
+    if (pendingPresetNum < 0) {
+      display->setTextAlignment(TEXT_ALIGN_CENTER);
+      display->setFont(HUGE_FONT);
+      display->drawString((display->width())/2 + x, 11 + y, String((localPresetNum + 1)%10)); // +1 for humans
+      if (!((localPresetNum + 1)/10 < 1)) {
+        display->setTextAlignment(TEXT_ALIGN_RIGHT);
+        display->setFont(XL_FONT);
+        display->drawString( x + boxWidth*2 , 20 + y, String((int)((localPresetNum + 1)/10))); // +1 for humans
+        display->setTextAlignment(TEXT_ALIGN_CENTER);
+      }
+      display->setFont(SMALL_FONT);
+      display->drawStringMaxWidth(x + boxWidth*3 + (boxWidth*2/3), y + 16, boxWidth*1.7, localPresetName(localPresetNum) );
+    } else {
+      if (vScroller !=0) {
+      if ( millis() > scrollCounter ) {
+          vScroller = vScroller - 2*((vScroller > 0) - (vScroller < 0));
+          scrollCounter = millis() + 15;
+        }
+      }   // animation
+      display->setTextAlignment(TEXT_ALIGN_RIGHT);
+      display->setFont(BIG_FONT);
+      int offsetX = display->getStringWidth("00");
+      display->drawString(offsetX + x, 27 + y, String(localPresetNum+1) );
+      display->setTextAlignment(TEXT_ALIGN_LEFT);
+      display->setFont(SMALL_FONT);
+      display->drawString(offsetX + x+6, 10 + y + vScroller, localPresetName(localPresetNum-2) );
+      display->drawString(offsetX + x+6, 20 + y + vScroller, localPresetName(localPresetNum-1) );
+      display->drawString(offsetX + x+6, 45 + y + vScroller, localPresetName(localPresetNum+1) );
+      display->drawString(offsetX + x+6, 55 + y + vScroller, localPresetName(localPresetNum+2) );
+      display->setColor(BLACK);
+      display->fillRect(x+offsetX, y+31, display->width()-offsetX, 17);
+      display->setFont(MID_FONT);
+      display->setColor(INVERSE);
+      offsetX = offsetX + 4;
+      display->drawString(offsetX + x-1, 29 + y , localPresetName(localPresetNum) );
+    }
+    display->setColor(BLACK);
+    display->fillRect(x+0, y+0, display->width()-8, 16);
+    display->setFont(SMALL_FONT);
+    display->setColor(INVERSE);
+    display->setTextAlignment(TEXT_ALIGN_CENTER);
+    for (int i=0 ; i<PEDALS_NUM; i++) {
+      if (BUTTONS[i].fxState) {
+        display->fillRect(x+(i*pxPerLabel+(pxPerLabel-boxWidth)/2),y,boxWidth,14);
+      }
+      display->drawString(x+((i+0.5)*pxPerLabel),y,(BUTTONS[i].fxLabel));
+    }
+    if (Button3_State) {
+      display->drawRect(x+((pxPerLabel-boxWidth)/2) + boxWidth*1.7/6,y + 32,boxWidth*2/3,14);
+      display->drawString(x + (boxWidth*3.8/6),y + 32 ,"Md");
+    }else{
+      display->fillRect(x+((pxPerLabel-boxWidth)/2),y + 32,boxWidth*1.7/3,14);
+      display->drawString(x + (boxWidth*1.7/6),y + 32 ,"Dr");
+    }
+    if (Button4_State) {
+      display->drawRect(x+((pxPerLabel-boxWidth)/2) + boxWidth*1.7/6,y + 48,boxWidth*2/3,14);
+      display->drawString(x + (boxWidth*3.6/6),y + 48 ,"Rv");
+    }else{
+      display->fillRect(x+((pxPerLabel-boxWidth)/2),y + 48,boxWidth*1.7/3,14);
+      display->drawString(x + (boxWidth*1.7/6),y + 48 ,"Dy");
+    }
+  }
 }
 
 
@@ -634,12 +724,12 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
     returnToMainUI();
   } 
   DEBUG("Button: id: " + (String)id + " eventType: " + (String)eventType + "; buttonState: " + (String)buttonState );
-  if (mode == MODE_LEVEL) {
-    if (id==4 && eventType==ace_button::AceButton::kEventPressed) {
-      changeKnobFx(+1);
-      return;
-    }
-  }
+  // if (mode == MODE_LEVEL) {
+  //   if (id==4 && eventType==ace_button::AceButton::kEventPressed) {
+  //     changeKnobFx(+1);
+  //     return;
+  //   }
+  // }
   if (eventType == ace_button::AceButton::kEventClicked) {
     if (id==5) {
       cycleMode();
@@ -657,41 +747,73 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
       case ace_button::AceButton::kEventPressed:
         if (bypass) {
           toggleBypass();
+          return;
         } else {
           if (id<PEDALS_NUM) {
             toggleEffect(BUTTONS[id].fxSlotNumber);
+            return;
           }
-          if (id==4) {
-            tempFrame(MODE_LEVEL,mode,FRAME_TIMEOUT);
-          }
+          // if (id==4) {
+          //   tempFrame(MODE_LEVEL,mode,FRAME_TIMEOUT);
+          // }
         }
         break;
       case ace_button::AceButton::kEventLongPressed:
-        if (id<PEDALS_NUM) {
-          toggleEffect(BUTTONS[id].fxSlotNumber);
+        if (id == 0) {
+          selectMode(1);
+          return;
         }
-        if (id==0) {
-           tempFrame(MODE_ABOUT,mode,4000);
+        if (id==1) {
+          selectMode(2);
+          return;
         }
-        if (id == 1) {
+        if (id==2) {
           toggleBypass();
+          return;
+        }
+        if (id==3) {
+          ESP_off();
+          return;
         }
         break;
       case ace_button::AceButton::kEventClicked:
         break;
       case ace_button::AceButton::kEventDoubleClicked:
+        if (id==0) {
+          switchPresets(0);
+          return;
+        }
+        if (id==1) {
+          switchPresets(1);
+          return;
+        }
+        if (id==2) {
+          switchPresetsX10(0);
+          return;
+        }
+        if (id==3) {
+          switchPresetsX10(1);
+          return;
+        }
         break;
     }
     return;
   }
   if (mode==MODE_SCENES){
     switch (eventType) {
+      case ace_button::AceButton::kEventDoubleClicked:
+        // if (id<PEDALS_NUM) {
+        //   toggleEffect(BUTTONS[id].fxSlotNumber);
+        // return;
+        // }
+        break;
       case ace_button::AceButton::kEventClicked:
         if (localSceneNum==-1) {
           if (id<PEDALS_NUM){
             spark_io.change_hardware_preset(id);
             localPresetNum = id;
             remotePresetNum = id;
+            return;
           }
         } else {
           // intelligent changing presets
@@ -699,15 +821,116 @@ void handleButtonEvent(ace_button::AceButton* button, uint8_t eventType, uint8_t
           remotePresetNum = TMP_PRESET_ADDR;
         }
         break;
-      case ace_button::AceButton::kEventLongPressed:
-        if (id<PEDALS_NUM) {
-          infoCaption = "SCENE " + String(localSceneNum);
-          infoText = "Saving: " + String(id+1); 
-          tempFrame(MODE_INFO, MODE_SCENES, 1000);
-          savePresetToFile(presets[CUR_EDITING], "/s" + String(localSceneNum) + "/" + String(id) + ".json");
+      case ace_button::AceButton::kEventPressed:
+        if (bypass) {
+          toggleBypass();
+          return;
         }
         break;
+      case ace_button::AceButton::kEventLongPressed:
+        if (id == 0) {
+          toggleBypass();
+          return;
+        }
+        if (id==1) {
+          selectMode(2);
+          return;
+        }
+        if (id==2) {
+          selectMode(0);
+          return;
+        }
+        if (id==3) {
+          ESP_off();
+          return;
+        }
+        break;
+    }
+    return;
+  }
+  if (mode==MODE_SETTINGS){
+    switch (eventType) {
       case ace_button::AceButton::kEventDoubleClicked:
+        // if (id<PEDALS_NUM) {
+        //   toggleEffect(BUTTONS[id].fxSlotNumber);
+        // return;
+        // }
+        if (id==0) {
+          switchPresetsX10Setting(0);
+          return;
+        }
+        if (id==1) {
+          switchPresetsX10Setting(1);
+          return;
+        }
+        if (id==2) {
+          Button3_State = !Button3_State;
+          if (Button3_State) {
+            toggleEffect(BUTTONS[0].fxSlotNumber);
+          }else{
+            toggleEffect(BUTTONS[1].fxSlotNumber);
+          }
+          return;
+        }
+        if (id==3) {
+          Button4_State = !Button4_State;
+          if (Button4_State) {
+            toggleEffect(BUTTONS[2].fxSlotNumber);
+          }else{
+            toggleEffect(BUTTONS[3].fxSlotNumber);
+          }
+          return;
+        }
+        break;
+      case ace_button::AceButton::kEventClicked:
+        if (id==0) {
+          switchPresetsSetting(0);
+          return;
+        }
+        if (id==1) {
+          switchPresetsSetting(1);
+          return;
+        }
+        if (id==2) {
+          if (Button3_State) {
+            toggleEffect(BUTTONS[1].fxSlotNumber);
+          }else{
+            toggleEffect(BUTTONS[0].fxSlotNumber);
+          }
+          return;
+        }
+        if (id==3) {
+          if (Button4_State) {
+            toggleEffect(BUTTONS[3].fxSlotNumber);
+          }else{
+            toggleEffect(BUTTONS[2].fxSlotNumber);
+          }
+          return;
+        }
+        break;
+      case ace_button::AceButton::kEventPressed:
+        if (bypass) {
+          toggleBypass();
+          return;
+        }
+        break;
+      case ace_button::AceButton::kEventLongPressed:
+        if (id == 0) {
+          selectMode(1);
+          return;
+        }
+        if (id==1) {
+          toggleBypass();
+          return;
+        }
+        if (id==2) {
+          selectMode(0);
+          return;
+        }
+        if (id==3) {
+          ESP_off();
+          return;
+        }
         break;
     }
     return;
@@ -737,7 +960,7 @@ void btConnect() {
       btAttempts = 0;     
       btCaption = "RETRIEVING..";
       while (!greetings() && btConnected) {} // we should be sure that comms are ok
-      mode = MODE_EFFECTS;
+      mode = MODE_SCENES; // default mode on startup
       tempFrame(MODE_ABOUT, mode, 3000);
     } else {
       ui.switchToFrame(MODE_CONNECT);
@@ -1064,6 +1287,98 @@ void handlePresets(int x) {
   DEBUG("Pending preset: " + localPresetNum + " to " + String(remotePresetNum,HEX));
   updateFxStatuses();
 }
+void switchPresets(int x) {
+  if (x == 0) {
+    localPresetNum--;
+    if (localPresetNum<0) localPresetNum=TOTAL_PRESETS-1;
+    if (localPresetNum==6) localPresetNum--;
+  }
+  if (x == 1) {
+    localPresetNum++;
+    if (localPresetNum>TOTAL_PRESETS-1) localPresetNum = 0;
+    if (localPresetNum==6) localPresetNum++;
+  }
+  if (localPresetNum < HW_PRESETS ) {
+    remotePresetNum = localPresetNum;
+  } else {
+    remotePresetNum = TMP_PRESET_ADDR;
+  }
+  setPendingPreset(localPresetNum);
+  DEBUG("Pending preset: " + localPresetNum + " to " + String(remotePresetNum,HEX));
+  updateFxStatuses();
+}
+void switchPresetsSetting(int x) {
+  if (x == 0) {
+    localPresetNum--;
+    if ((localPresetNum<0 || localPresetNum<HW_PRESETS)) localPresetNum=TOTAL_PRESETS-1;
+  }
+  if (x == 1) {
+    localPresetNum++;
+    if ((localPresetNum>TOTAL_PRESETS-1 || localPresetNum<HW_PRESETS)) localPresetNum = 5;
+  }
+  if (localPresetNum < HW_PRESETS ) {
+    remotePresetNum = localPresetNum;
+  } else {
+    remotePresetNum = TMP_PRESET_ADDR;
+  }
+  setPendingPreset(localPresetNum);
+  DEBUG("Pending preset: " + localPresetNum + " to " + String(remotePresetNum,HEX));
+  updateFxStatuses();
+}
+void switchPresetsX10(int x) {
+  if (x == 0) {
+    if ((localPresetNum % 10) >6) {
+      localPresetNum = ((int)(localPresetNum/10))*10-1;
+      if (localPresetNum<0) localPresetNum=0;
+    }else{
+      localPresetNum = ((int)(localPresetNum/10-1))*10-1;
+      if (localPresetNum<0) localPresetNum=((int)((TOTAL_PRESETS)/10))*10-1;
+    }
+  }
+  if (x == 1) {
+    if ((localPresetNum % 10) > 7) {
+      localPresetNum = ((int)(localPresetNum/10+2))*10-1;
+    }else{
+      localPresetNum = ((int)(localPresetNum/10+1))*10-1;
+    }
+  }
+  if (localPresetNum < HW_PRESETS ) {
+    remotePresetNum = localPresetNum;
+  } else {
+    remotePresetNum = TMP_PRESET_ADDR;
+  }
+  setPendingPreset(localPresetNum);
+  DEBUG("Pending preset: " + localPresetNum + " to " + String(remotePresetNum,HEX));
+  updateFxStatuses();
+}
+void switchPresetsX10Setting(int x) {
+  if (x == 0) {
+    if ((localPresetNum % 10) >5) {
+      localPresetNum = ((int)(localPresetNum/10))*10-1;
+      if (localPresetNum<0) localPresetNum=0;
+    }else{
+      localPresetNum = ((int)(localPresetNum/10-1))*10-1;
+      if (localPresetNum<0) localPresetNum=((int)((TOTAL_PRESETS)/10))*10-1;
+    }
+    if (localPresetNum<HW_PRESETS) localPresetNum=5;
+  }
+  if (x == 1) {
+    if ((localPresetNum % 10) == 9) {
+      localPresetNum = ((int)(localPresetNum/10+2))*10-1;
+    }else{
+      localPresetNum = ((int)(localPresetNum/10+1))*10-1;
+    }
+    if (localPresetNum>TOTAL_PRESETS-1) localPresetNum = 5;
+  }
+  if (localPresetNum < HW_PRESETS ) {
+    remotePresetNum = localPresetNum;
+  } else {
+    remotePresetNum = TMP_PRESET_ADDR;
+  }
+  setPendingPreset(localPresetNum);
+  DEBUG("Pending preset: " + localPresetNum + " to " + String(remotePresetNum,HEX));
+  updateFxStatuses();
+}
 
 void handleScenes(int x) {
   returnToMainUI();
@@ -1095,14 +1410,18 @@ void cycleMode(){
     ui.setFrameAnimation(SLIDE_LEFT);
     mode=MODE_SCENES;
     break;
+  // case MODE_LEVEL:
+  //   ui.setFrameAnimation(SLIDE_LEFT);
+  //   mode=MODE_EFFECTS;
+  //   break;
   case MODE_SCENES:
     ui.setFrameAnimation(SLIDE_LEFT);
-    mode=MODE_SETTINGS;
-    break;
-  case MODE_SETTINGS:
-    ui.setFrameAnimation(SLIDE_RIGHT);
     mode=MODE_EFFECTS;
     break;
+  // case MODE_SETTINGS:
+  //   ui.setFrameAnimation(SLIDE_RIGHT);
+  //   mode=MODE_EFFECTS;
+  //   break;
   default:
     ui.setFrameAnimation(SLIDE_RIGHT);
     mode=MODE_EFFECTS;
@@ -1112,6 +1431,24 @@ void cycleMode(){
   ui.transitionToFrame(mode);
   ui.update();
 }
+void selectMode(int x){
+  if (x==0) {
+    ui.setFrameAnimation(SLIDE_LEFT);
+    mode=MODE_EFFECTS;
+  }
+  if (x==1) {
+    ui.setFrameAnimation(SLIDE_RIGHT);
+    mode=MODE_SCENES;
+  }
+  if (x==2) {
+    ui.setFrameAnimation(SLIDE_DOWN);
+    mode=MODE_SETTINGS;
+  }
+  ui.update();
+  ui.transitionToFrame(mode);
+  ui.update();
+}
+
 
 bool createFolders() {
   bool noErr = true;

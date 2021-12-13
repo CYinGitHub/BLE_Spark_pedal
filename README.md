@@ -17,6 +17,8 @@ This is my version of copych's BLE_Spark_pedal. I don't know coding, just copy-a
          3: Pedal Mode
 
          4: Sleep
+         
+         patch 5 is skipped since it is for hw temp
 
 
 Hardware Mode (Preset 1-4)

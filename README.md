@@ -8,6 +8,8 @@ This is my version of copych's BLE_Spark_pedal. I don't know coding, just copy-a
 
 I modified the main.cpp and fonts.h
 
+and added "Extract Presets From Backup.py" to help extracting the presets
+
 
    Common Function:
 

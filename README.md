@@ -12,12 +12,15 @@ I modified the main.cpp and fonts.h
 and added "Extract Presets From Backup.py" to help extracting the presets
 
 
-new button pin:
+new button pin: 
 
       1: Pin5
       2: Pin4
       3: Pin18
       4: Pin19
+      
+      I dont use encoder, so idk if the encoder pin will work or not. 
+      if i decided to add encoder at the future, i might tweak it if it doesn't work.       
 
 
    Common Function:

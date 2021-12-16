@@ -73,7 +73,7 @@ savePresetToFile()
 #define BT_CONNECTS_BEFORE_OFF 10
 #define HW_PRESETS 5  // 4 hardware presets + 1 temporary in amp presets
 #define HARD_PRESETS 24  // number of hard-coded presets in SparkPresets.h
-#define FLASH_PRESETS 54  // number of presets stored in on-board flash
+#define FLASH_PRESETS 74  // number of presets stored in on-board flash
 #define TOTAL_PRESETS HW_PRESETS + FLASH_PRESETS
 #define TOTAL_SCENES 10 // number of 4-efx combinations to store
 #define TRANSITION_TIME 200 //(ms) ui slide effect timing

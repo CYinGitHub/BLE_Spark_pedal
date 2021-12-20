@@ -4,6 +4,9 @@
 [![](https://www.travis-ci.com/copych/BLE_Spark_pedal.svg?branch=withBLE)](https://www.travis-ci.com/github/copych/BLE_Spark_pedal)
 
 
+
+thinking of making a vox tonelab style tone selection on SW bank mode, which switches between group of 4 tones. 0-1 to 0-4 is hw preset, 1-1 to 1-4 is first set of sw preset, 2-1 to 2-4 is second set of sw preset, etc., ...
+
 This is my version of copych's BLE_Spark_pedal. I don't know coding, just copy-and-paste to modified some functions to convert it into 4-buttons Pedal:
 
 
